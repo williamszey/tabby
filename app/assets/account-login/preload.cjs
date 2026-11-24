@@ -1,5 +1,5 @@
 const { contextBridge, ipcRenderer } = require('electron')
 
 contextBridge.exposeInMainWorld('tabbyAccount', {
-    authenticate: (mode, email, password) => ipcRenderer.invoke('tabby-account:authenticate', mode, email, password),
+    authenticate: (mode, email, password, confirmation) => ipcRenderer.invoke('tabby-account:authenticate', mode, email, password, confirmation),
 })

@@ -1,14 +1,16 @@
-import { NgModule } from '@angular/core'
+import { Inject, NgModule } from '@angular/core'
 import { CommonModule } from '@angular/common'
 import { FormsModule } from '@angular/forms'
 import { NgbModule } from '@ng-bootstrap/ng-bootstrap'
 import { ToastrModule } from 'ngx-toastr'
 import { NgxFilesizeModule } from 'ngx-filesize'
-import TabbyCoreModule, { ConfigProvider, TabRecoveryProvider, HotkeyProvider, TabContextMenuItemProvider, ProfileProvider } from 'tabby-core'
+import TabbyCoreModule, { AppService, BOOTSTRAP_DATA, BootstrapData, CommandProvider, ConfigProvider, TabRecoveryProvider, HotkeyProvider, TabContextMenuItemProvider, ProfileProvider } from 'tabby-core'
 import { SettingsTabProvider } from 'tabby-settings'
 import TabbyTerminalModule from 'tabby-terminal'
 
 import { SSHProfileSettingsComponent } from './components/sshProfileSettings.component'
+import { SSHConnectionsComponent } from './components/sshConnections.component'
+import { SSHConnectionsCommand } from './sshConnectionsCommand'
 import { SSHPortForwardingModalComponent } from './components/sshPortForwardingModal.component'
 import { SSHPortForwardingConfigComponent } from './components/sshPortForwardingConfig.component'
 import { SSHSettingsTabComponent } from './components/sshSettingsTab.component'
@@ -46,10 +48,12 @@ import { SFTPCreateDirectoryModalComponent } from './components/sftpCreateDirect
         { provide: HotkeyProvider, useClass: SSHHotkeyProvider, multi: true },
         { provide: TabContextMenuItemProvider, useClass: SFTPContextMenu, multi: true },
         { provide: ProfileProvider, useExisting: SSHProfilesService, multi: true },
+        { provide: CommandProvider, useExisting: SSHConnectionsCommand, multi: true },
         { provide: SFTPContextMenuItemProvider, useClass: CommonSFTPContextMenu, multi: true },
     ],
     declarations: [
         SSHProfileSettingsComponent,
+        SSHConnectionsComponent,
         SFTPDeleteModalComponent,
         SFTPCreateDirectoryModalComponent,
         SSHPortForwardingModalComponent,
@@ -65,7 +69,17 @@ import { SFTPCreateDirectoryModalComponent } from './components/sftpCreateDirect
     ],
 })
 // eslint-disable-next-line @typescript-eslint/no-extraneous-class
-export default class SSHModule { }
+export default class SSHModule {
+    constructor (
+        app: AppService,
+        connections: SSHConnectionsCommand,
+        @Inject(BOOTSTRAP_DATA) bootstrap: BootstrapData,
+    ) {
+        if (bootstrap.accountId) {
+            app.ready$.subscribe(() => connections.open())
+        }
+    }
+}
 
 export * from './api'
 export { SFTPFile, SFTPSession } from './session/sftp'

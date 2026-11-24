@@ -14,7 +14,7 @@ export class AccountLogin {
         this.window = new BrowserWindow({
             title: 'Topper Terminal 登录',
             width: 460,
-            height: 430,
+            height: 515,
             useContentSize: true,
             resizable: false,
             show: false,
@@ -38,10 +38,13 @@ export class AccountLogin {
         this.result = new Promise((resolve, reject) => {
             let submitting = false
             let authenticated = false
-            ipcMain.handle(channel, async (event, mode: unknown, email: unknown, password: unknown): Promise<LoginResult> => {
+            ipcMain.handle(channel, async (event, mode: unknown, email: unknown, password: unknown, confirmation: unknown): Promise<LoginResult> => {
                 if (window.isDestroyed() || event.sender !== window.webContents ||
                     event.senderFrame?.parent !== null || submitting || authenticated) {
                     return 'unavailable'
+                }
+                if (mode === 'register' && (!password || password !== confirmation)) {
+                    return 'invalid'
                 }
 
                 submitting = true

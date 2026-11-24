@@ -1,4 +1,4 @@
-import { createHash, randomBytes, scrypt, timingSafeEqual } from 'node:crypto'
+import { createHash, createHmac, randomBytes, scrypt, timingSafeEqual } from 'node:crypto'
 import { link, mkdir, readFile, rm, writeFile } from 'node:fs/promises'
 import { createServer } from 'node:http'
 import { isIP } from 'node:net'
@@ -9,6 +9,8 @@ import { promisify } from 'node:util'
 const derivePassword = promisify(scrypt)
 const loginPath = '/api/tabby/login'
 const registerPath = '/api/tabby/register'
+const sessionPath = '/api/tabby/session'
+const sessionDuration = 30 * 24 * 60 * 60 * 1000
 const limitWindow = 60_000
 const bodyLimit = 4096
 
@@ -48,10 +50,10 @@ async function initializeAccount (directory, email, password) {
     return id
 }
 
-async function loadAccount (directory, email) {
+async function loadAccount (directory, emailHash) {
     let contents
     try {
-        contents = await readFile(accountPath(directory, email), 'utf8')
+        contents = await readFile(join(directory, `${emailHash}.json`), 'utf8')
     } catch (error) {
         if (error.code === 'ENOENT') {
             return null
@@ -90,17 +92,55 @@ async function readCredentials (request, registering) {
     return { status: 400 }
 }
 
-export function createAuthServer (directory, proxyIP) {
+function signSession (key, data) {
+    return createHmac('sha256', key).update(data).digest()
+}
+
+async function verifySession (key, directory, authorization) {
+    const match = /^Bearer ([a-f0-9]{64})\.([a-f0-9]{64})\.(\d{13})\.([a-f0-9]{64})$/.exec(authorization ?? '')
+    if (!match) return null
+    const [, emailHash, id, expires, signature] = match
+    if (Number(expires) <= Date.now() ||
+        !timingSafeEqual(signSession(key, `${emailHash}.${id}.${expires}`), Buffer.from(signature, 'hex'))) return null
+    const account = await loadAccount(directory, emailHash)
+    return account?.id === id ? account : null
+}
+
+async function loadSessionKey (directory) {
+    const file = join(directory, 'session.key')
+    const key = await readFile(file).catch(async error => {
+        if (error.code !== 'ENOENT') throw error
+        const temporary = `${file}.${randomBytes(8).toString('hex')}.tmp`
+        try {
+            await writeFile(temporary, randomBytes(32), { flag: 'wx', mode: 0o600 })
+            await link(temporary, file)
+        } catch (writeError) {
+            if (writeError.code !== 'EEXIST') throw writeError
+        } finally {
+            await rm(temporary, { force: true })
+        }
+        return readFile(file)
+    })
+    if (key.length !== 32) throw new Error('Invalid session key')
+    return key
+}
+
+export function createAuthServer (directory, proxyIP, sessionKey = randomBytes(32)) {
     let verifying = false
     const unavailableSalt = randomBytes(16).toString('hex')
     const limits = new Map([
         [loginPath, { windowEnds: 0, total: 0, globalLimit: 90, ipLimit: 12, byIP: new Map() }],
         [registerPath, { windowEnds: 0, total: 0, globalLimit: 12, ipLimit: 3, byIP: new Map() }],
+        [sessionPath, { windowEnds: 0, total: 0, globalLimit: 360, ipLimit: 60, byIP: new Map() }],
     ])
     const server = createServer({ headersTimeout: 5000, requestTimeout: 8000, connectionsCheckingInterval: 1000 }, async (request, response) => {
         const reply = status => response.writeHead(status, { 'Cache-Control': 'no-store' }).end()
-        const authenticated = (status, id) => {
+        const authenticated = (status, id, emailHash) => {
             response.setHeader('X-Tabby-Account', id)
+            if (emailHash && request.headers['x-topper-client'] === 'desktop') {
+                const data = `${emailHash}.${id}.${Date.now() + sessionDuration}`
+                response.setHeader('X-Topper-Session', `${data}.${signSession(sessionKey, data).toString('hex')}`)
+            }
             return reply(status)
         }
         if (proxyIP && request.socket.remoteAddress !== proxyIP) {
@@ -114,7 +154,7 @@ export function createAuthServer (directory, proxyIP) {
             response.setHeader('Allow', 'POST')
             return reply(405)
         }
-        if (request.headers['content-type']?.split(';')[0].trim() !== 'application/json') {
+        if (request.url !== sessionPath && request.headers['content-type']?.split(';')[0].trim() !== 'application/json') {
             return reply(415)
         }
         if (Number(request.headers['content-length']) > bodyLimit) {
@@ -140,6 +180,10 @@ export function createAuthServer (directory, proxyIP) {
         limit.byIP.set(ip, ipAttempts + 1)
 
         try {
+            if (request.url === sessionPath) {
+                const account = await verifySession(sessionKey, directory, request.headers.authorization)
+                return account ? authenticated(204, account.id) : reply(401)
+            }
             const registering = request.url === registerPath
             const credentials = await readCredentials(request, registering)
             if (credentials.status) {
@@ -155,9 +199,10 @@ export function createAuthServer (directory, proxyIP) {
             verifying = true
             try {
                 const { email, password } = credentials
+                const emailHash = createHash('sha256').update(email).digest('hex')
                 if (registering) {
                     try {
-                        return authenticated(201, await initializeAccount(directory, email, password))
+                        return authenticated(201, await initializeAccount(directory, email, password), emailHash)
                     } catch (error) {
                         if (error.code === 'EEXIST') {
                             return reply(409)
@@ -165,10 +210,10 @@ export function createAuthServer (directory, proxyIP) {
                         throw error
                     }
                 }
-                const account = await loadAccount(directory, email)
+                const account = await loadAccount(directory, emailHash)
                 const hash = await hashPassword(password, account?.salt ?? unavailableSalt)
                 if (account && timingSafeEqual(hash, Buffer.from(account.hash, 'hex'))) {
-                    return authenticated(204, account.id)
+                    return authenticated(204, account.id, emailHash)
                 }
                 return reply(401)
             } finally {
@@ -189,5 +234,5 @@ if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.ur
     const host = process.env.TABBY_AUTH_HOST ?? '127.0.0.1'
     const port = Number(process.env.TABBY_AUTH_PORT ?? 18742)
     await mkdir(directory, { recursive: true, mode: 0o700 })
-    createAuthServer(directory, process.env.TABBY_AUTH_PROXY_IP).listen(port, host, () => console.log(`Tabby auth listening on ${host}:${port}`))
+    createAuthServer(directory, process.env.TABBY_AUTH_PROXY_IP, await loadSessionKey(directory)).listen(port, host, () => console.log(`Tabby auth listening on ${host}:${port}`))
 }

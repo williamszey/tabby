@@ -1,7 +1,7 @@
 // Registers main-process error logging - must be first so it catches import-time errors
 import { logMainError } from './errors'
 
-import { app, ipcMain, Menu, dialog } from 'electron'
+import { app, BrowserWindow, ipcMain, Menu, dialog } from 'electron'
 import { execFile } from 'child_process'
 import { mkdir } from 'fs/promises'
 import * as path from 'path'
@@ -97,8 +97,12 @@ app.on('second-instance', (_event, newArgv, cwd) => {
 
 app.on('ready', async () => {
     try {
-        accountLogin = new AccountLogin(new AuthClient(process.env.TABBY_DEV ? process.env.TABBY_AUTH_BASE_URL : undefined))
-        const accountId = await accountLogin.result
+        const auth = new AuthClient(process.env.TABBY_CONFIG_DIRECTORY!, process.env.TABBY_DEV ? process.env.TABBY_AUTH_BASE_URL : undefined)
+        let accountId = await auth.restoreSession()
+        if (!accountId) {
+            accountLogin = new AccountLogin(auth)
+            accountId = await accountLogin.result
+        }
         if (!accountId) {
             app.quit()
             return
@@ -115,6 +119,25 @@ app.on('ready', async () => {
         const accountDirectory = path.join(process.env.TABBY_CONFIG_DIRECTORY!, 'accounts', accountId)
         await mkdir(accountDirectory, { recursive: true, mode: 0o700 })
         application = new Application(accountId, accountDirectory)
+        ipcMain.handle('app:sign-out', async event => {
+            const parent = BrowserWindow.fromWebContents(event.sender)
+            if (!parent) {
+                return
+            }
+            const result = await dialog.showMessageBox(parent, {
+                type: 'question',
+                message: '退出登录会关闭所有终端窗口。',
+                buttons: ['取消', '退出登录'],
+                defaultId: 0,
+                cancelId: 0,
+            })
+            if (result.response === 1) {
+                await auth.clearSession()
+                const portable = process.env.PORTABLE_EXECUTABLE_FILE
+                app.relaunch(portable ? { execPath: portable } : {})
+                app.exit()
+            }
+        })
         if (process.platform === 'darwin') {
             app.dock?.setMenu(Menu.buildFromTemplate([
                 { label: 'New window', click: () => application?.newWindow() },
@@ -123,7 +146,7 @@ app.on('ready', async () => {
         application.init()
 
         const opening = application.newWindow({ hidden: argv.hidden })
-        accountLogin.close()
+        accountLogin?.close()
         accountLogin = undefined
         const window = await opening
         window.passCliArguments(process.argv, process.cwd(), false)

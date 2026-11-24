@@ -1,4 +1,4 @@
-import { NgModule, ModuleWithProviders, LOCALE_ID } from '@angular/core'
+import { Inject, NgModule, ModuleWithProviders, LOCALE_ID } from '@angular/core'
 import { BrowserAnimationsModule } from '@angular/platform-browser/animations'
 import { CommonModule } from '@angular/common'
 import { FormsModule } from '@angular/forms'
@@ -54,6 +54,7 @@ import { TaskCompletionContextMenu, CommonOptionsContextMenu, TabManagementConte
 import { LastCLIHandler, ProfileCLIHandler } from './cli'
 import { SplitLayoutProfilesService } from './profiles'
 import { CoreCommandProvider } from './commands'
+import { BOOTSTRAP_DATA, BootstrapData } from './api/mainProcess'
 
 export function TranslateMessageFormatCompilerFactory (): TranslateMessageFormatCompiler {
     return new TranslateMessageFormatCompiler()
@@ -162,10 +163,11 @@ export default class AppModule { // eslint-disable-line @typescript-eslint/no-ex
         private translate: TranslateService,
         private profilesService: ProfilesService,
         private selector: SelectorService,
+        @Inject(BOOTSTRAP_DATA) bootstrap: BootstrapData,
     ) {
         app.ready$.subscribe(() => {
             config.ready$.toPromise().then(() => {
-                if (config.store.enableWelcomeTab) {
+                if (!bootstrap.accountId && config.store.enableWelcomeTab) {
                     app.openNewTabRaw({ type: WelcomeTabComponent })
                 }
             })

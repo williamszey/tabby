@@ -1,6 +1,6 @@
     @tabbyAuth {
         host topperapi.com
-        path /api/tabby/login /api/tabby/register
+        path /api/tabby/login /api/tabby/register /api/tabby/session
     }
     handle @tabbyAuth {
         reverse_proxy tabby-auth:18742 {

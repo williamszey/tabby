@@ -43,5 +43,9 @@ export abstract class HostAppService {
 
     abstract relaunch (): void
 
+    async signOut (): Promise<void> {
+        throw new Error('Signing out is unavailable')
+    }
+
     abstract quit (): void
 }

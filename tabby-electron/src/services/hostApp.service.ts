@@ -66,6 +66,10 @@ export class ElectronHostAppService extends HostAppService {
         this.electron.ipcRenderer.send('app:ready')
     }
 
+    async signOut (): Promise<void> {
+        await this.electron.ipcRenderer.invoke('app:sign-out')
+    }
+
     relaunch (): void {
         const isPortable = !!process.env.PORTABLE_EXECUTABLE_FILE
         if (isPortable) {
