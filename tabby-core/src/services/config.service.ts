@@ -8,6 +8,7 @@ import { TranslateService } from '@ngx-translate/core'
 import { ConfigProvider } from '../api/configProvider'
 import { PlatformService } from '../api/platform'
 import { HostAppService } from '../api/hostApp'
+import { isDisabledWindowHotkey } from './hotkeys.util'
 import { Vault, VaultService } from './vault.service'
 import { serializeFunction } from '../utils'
 import { PartialProfileGroup, ProfileGroup } from '../api/profileProvider'
@@ -463,18 +464,18 @@ export class ConfigService {
             }
             config.version = 8
         }
-        if (config.version < 9) {
+        if (config.version < 10) {
             const bindings: unknown = config.hotkeys?.['toggle-window']
             const isLegacyShortcut = (binding: unknown) => {
                 const key = Array.isArray(binding) ? binding[0] : binding
-                return typeof key === 'string' && /^(ctrl|control)[-+]space$/i.test(key.replace(/\s/g, ''))
+                return isDisabledWindowHotkey(key)
             }
             if (typeof bindings === 'string' && isLegacyShortcut(bindings)) {
                 config.hotkeys['toggle-window'] = []
             } else if (Array.isArray(bindings)) {
                 config.hotkeys['toggle-window'] = bindings.filter(binding => !isLegacyShortcut(binding))
             }
-            config.version = 9
+            config.version = 10
         }
     }
 

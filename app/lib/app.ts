@@ -12,6 +12,7 @@ import { Window, WindowOptions } from './window'
 import { pluginManager } from './pluginManager'
 import { PTYManager } from './pty'
 import { logMainError } from './errors'
+import { isDisabledWindowHotkey } from '../../tabby-core/src/services/hotkeys.util'
 
 // GPU and Chromium switches must be configured before Electron's ready event.
 // eslint-disable-next-line @typescript-eslint/explicit-module-boundary-types
@@ -70,6 +71,9 @@ export class Application {
                 return
             }
             for (const spec of specs) {
+                if (isDisabledWindowHotkey(spec)) {
+                    continue
+                }
                 // One invalid accelerator must not prevent the remaining hotkeys from registering
                 try {
                     globalShortcut.register(spec, () => this.globalHotkey$.next())

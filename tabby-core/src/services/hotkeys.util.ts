@@ -11,6 +11,15 @@ export const altKeyName = {
     linux: 'Alt',
 }[process.platform]
 
+export function isDisabledWindowHotkey (key: unknown, platform = process.platform): boolean {
+    if (typeof key !== 'string') {
+        return false
+    }
+    const accelerator = key.replace(/\s/g, '').replace(/-/g, '+')
+    return /^(?:ctrl|control|⌃)\+space(?:bar)?$/i.test(accelerator) ||
+        (platform !== 'darwin' && /^(?:cmdorctrl|commandorcontrol)\+space(?:bar)?$/i.test(accelerator))
+}
+
 export interface KeyEventData {
     ctrlKey?: boolean
     metaKey?: boolean
