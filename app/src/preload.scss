@@ -15,7 +15,7 @@ app-root {
   background-color: black;
 
   &>div {
-    width: 200px;
+    width: 280px;
     height: 200px;
     margin: auto;
     flex: none;
@@ -46,9 +46,7 @@ app-root {
 .tabby-logo {
   width: 120px;
   height: 120px;
-  background: url('../assets/logo.svg');
-  background-repeat: none;
-  background-size: contain;
+  background: url('../assets/topper-terminal.png') center / contain no-repeat;
   margin: auto;
 }
 

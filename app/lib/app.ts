@@ -7,11 +7,34 @@ import * as path from 'path'
 import * as fs from 'fs'
 import { Subject, throttleTime } from 'rxjs'
 
-import { saveConfig } from './config'
+import { loadConfig, saveConfig } from './config'
 import { Window, WindowOptions } from './window'
 import { pluginManager } from './pluginManager'
 import { PTYManager } from './pty'
 import { logMainError } from './errors'
+
+// GPU and Chromium switches must be configured before Electron's ready event.
+// eslint-disable-next-line @typescript-eslint/explicit-module-boundary-types
+export function configureApplication (configStore: any): void {
+    if (process.platform === 'linux') {
+        app.commandLine.appendSwitch('no-sandbox')
+        if ((configStore.appearance?.opacity || 1) !== 1) {
+            app.commandLine.appendSwitch('enable-transparent-visuals')
+            app.disableHardwareAcceleration()
+        }
+    }
+    if (configStore.hacks?.disableGPU) {
+        app.commandLine.appendSwitch('disable-gpu')
+        app.disableHardwareAcceleration()
+    }
+
+    app.commandLine.appendSwitch('disable-http-cache')
+    app.commandLine.appendSwitch('max-active-webgl-contexts', '9000')
+    app.commandLine.appendSwitch('lang', 'EN')
+    for (const flag of configStore.electronFlags || []) {
+        app.commandLine.appendSwitch(flag[0], flag[1])
+    }
+}
 
 export class Application {
     private tray?: Tray
@@ -20,10 +43,13 @@ export class Application {
     private cachedPlasmaVersion?: [number, number] | null
     private globalHotkey$ = new Subject<void>()
     private quitRequested = false
+    private configStore: any
+    readonly configPath: string
     userPluginsPath: string
 
-    // eslint-disable-next-line @typescript-eslint/explicit-module-boundary-types
-    constructor (private configStore: any) {
+    constructor (public readonly accountId: string, accountDirectory: string) {
+        this.configPath = path.join(accountDirectory, 'config.yaml')
+        this.configStore = loadConfig(this.configPath)
         remote.initialize()
         this.ptyManager.init(this)
 
@@ -34,7 +60,7 @@ export class Application {
         })
 
         ipcMain.handle('app:save-config', async (event, config) => {
-            await saveConfig(config)
+            await saveConfig(this.configPath, config)
             this.broadcastExcept('host:config-change', event.sender, config)
         })
 
@@ -73,34 +99,10 @@ export class Application {
             }
         })
 
-        if (process.platform === 'linux') {
-            app.commandLine.appendSwitch('no-sandbox')
-            if ((this.configStore.appearance?.opacity || 1) !== 1) {
-                app.commandLine.appendSwitch('enable-transparent-visuals')
-                app.disableHardwareAcceleration()
-            }
-        }
-        if (this.configStore.hacks?.disableGPU) {
-            app.commandLine.appendSwitch('disable-gpu')
-            app.disableHardwareAcceleration()
-        }
-
-        this.userPluginsPath = path.join(
-            app.getPath('userData'),
-            'plugins',
-        )
+        this.userPluginsPath = path.join(accountDirectory, 'plugins')
 
         if (!fs.existsSync(this.userPluginsPath)) {
             fs.mkdirSync(this.userPluginsPath)
-        }
-
-        app.commandLine.appendSwitch('disable-http-cache')
-        app.commandLine.appendSwitch('max-active-webgl-contexts', '9000')
-        app.commandLine.appendSwitch('lang', 'EN')
-
-        // Leave adapter selection to the OS unless the user supplies a flag
-        for (const flag of this.configStore.electronFlags || []) {
-            app.commandLine.appendSwitch(flag[0], flag[1])
         }
 
         app.on('before-quit', () => {
@@ -216,7 +218,7 @@ export class Application {
             this.tray.setContextMenu(contextMenu)
         }
 
-        this.tray.setToolTip(`Tabby ${app.getVersion()}`)
+        this.tray.setToolTip(`${app.getName()} ${app.getVersion()}`)
     }
 
     disableTray (): void {
@@ -305,7 +307,7 @@ export class Application {
             {
                 label: 'Application',
                 submenu: [
-                    { role: 'about', label: 'About Tabby' },
+                    { role: 'about', label: `About ${app.getName()}` },
                     { type: 'separator' },
                     {
                         label: 'Preferences',
@@ -371,7 +373,7 @@ export class Application {
                     {
                         label: 'Website',
                         click () {
-                            shell.openExternal('https://eugeny.github.io/tabby')
+                            shell.openExternal('https://topperapi.com')
                         },
                     },
                 ],

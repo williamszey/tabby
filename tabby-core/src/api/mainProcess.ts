@@ -21,4 +21,6 @@ export interface BootstrapData {
     windowID: number
     installedPlugins: PluginInfo[]
     userPluginsPath: string
+    configPath?: string
+    accountId?: string
 }

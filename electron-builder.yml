@@ -1,12 +1,12 @@
 ---
-appId: org.tabby
-productName: Tabby
+appId: com.topperapi.terminal
+productName: Topper Terminal
 compression: normal
 npmRebuild: false
 protocols:
-  - name: Tabby URL
+  - name: Topper Terminal URL
     schemes:
-      - tabby
+      - topper-terminal
 files:
 - '**/*'
 - dist
@@ -39,14 +39,16 @@ files:
 extraResources:
 - builtin-plugins
 - extras
+- from: LICENSE
+  to: LICENSE-Tabby.txt
 asarUnpack:
 - 'dist/*.map'
 - node_modules/keytar/build/Release/*.node
 - node_modules/**/*.node
 - node_modules/node-pty/build/Release/conpty/*
 win:
-  icon: "./build/windows/icon.ico"
-  artifactName: tabby-${version}-portable-${env.ARCH}.${ext}
+  icon: "./app/assets/topper-terminal.png"
+  artifactName: Topper-Terminal-${version}-portable-${arch}.${ext}
   signtoolOptions:
     rfc3161TimeStampServer: http://timestamp.sectigo.com
   # OpenConsole.exe is already signed by Microsoft
@@ -54,14 +56,13 @@ win:
   - '!OpenConsole.exe'
 nsis:
   oneClick: false
-  artifactName: tabby-${version}-setup-${env.ARCH}.${ext}
-  installerIcon: "./build/windows/icon.ico"
+  artifactName: Topper-Terminal-${version}-setup-${arch}.${ext}
   allowToChangeInstallationDirectory: true
-  shortcutName: Tabby Terminal
+  shortcutName: Topper Terminal
 mac:
   category: public.app-category.utilities
-  icon: "./build/mac/icon.icns"
-  artifactName: tabby-${version}-macos-${env.ARCH}.${ext}
+  icon: "./app/assets/topper-terminal.png"
+  artifactName: Topper-Terminal-${version}-macOS-${arch}.${ext}
   hardenedRuntime: true
   entitlements: "./build/mac/entitlements.plist"
   entitlementsInherit: "./build/mac/entitlements.plist"
@@ -86,8 +87,8 @@ linux:
   - "--no-sandbox"
   desktop:
     entry:
-      StartupWMClass: tabby
-      MimeType: x-scheme-handler/tabby
+      StartupWMClass: topper-terminal
+      MimeType: x-scheme-handler/topper-terminal
 snap:
   plugs:
   - default

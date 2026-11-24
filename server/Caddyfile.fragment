@@ -1,0 +1,10 @@
+    @tabbyAuth {
+        host topperapi.com
+        path /api/tabby/login /api/tabby/register
+    }
+    handle @tabbyAuth {
+        reverse_proxy tabby-auth:18742 {
+            header_up X-Real-IP {remote_host}
+        }
+    }
+

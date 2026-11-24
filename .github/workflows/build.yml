@@ -1,5 +1,9 @@
 name: Package-Build
-on: [push, pull_request]
+on:
+  push:
+    branches-ignore: [topper-terminal-preview]
+    tags: ['**']
+  pull_request:
 jobs:
   Lint:
     runs-on: ubuntu-24.04

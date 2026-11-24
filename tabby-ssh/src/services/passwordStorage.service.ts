@@ -1,6 +1,6 @@
 import * as keytar from 'keytar'
-import { Injectable } from '@angular/core'
-import { VaultService } from 'tabby-core'
+import { Inject, Injectable, Optional } from '@angular/core'
+import { BOOTSTRAP_DATA, BootstrapData, VaultService } from 'tabby-core'
 import { SSHProfile } from '../api'
 
 export const VAULT_SECRET_TYPE_PASSWORD = 'ssh:password'
@@ -8,13 +8,20 @@ export const VAULT_SECRET_TYPE_PASSPHRASE = 'ssh:key-passphrase'
 
 @Injectable({ providedIn: 'root' })
 export class PasswordStorageService {
-    constructor (private vault: VaultService) { }
+    private keychainPrefix: string
+
+    constructor (
+        private vault: VaultService,
+        @Optional() @Inject(BOOTSTRAP_DATA) bootstrapData?: BootstrapData,
+    ) {
+        this.keychainPrefix = bootstrapData?.accountId ? `tabby:${bootstrapData.accountId}:` : ''
+    }
 
     async savePassword (profile: SSHProfile, password: string, username?: string): Promise<void> {
         const account = username ?? profile.options.user
         if (this.vault.isEnabled()) {
             const key = this.getVaultKeyForConnection(profile, account)
-            this.vault.addSecret({ type: VAULT_SECRET_TYPE_PASSWORD, key, value: password })
+            await this.vault.addSecret({ type: VAULT_SECRET_TYPE_PASSWORD, key, value: password })
         } else {
             if (!account) {
                 return
@@ -28,7 +35,7 @@ export class PasswordStorageService {
         const account = username ?? profile.options.user
         if (this.vault.isEnabled()) {
             const key = this.getVaultKeyForConnection(profile, account)
-            this.vault.removeSecret(VAULT_SECRET_TYPE_PASSWORD, key)
+            await this.vault.removeSecret(VAULT_SECRET_TYPE_PASSWORD, key)
         } else {
             if (!account) {
                 return
@@ -92,11 +99,11 @@ export class PasswordStorageService {
         if (profile.options.port) {
             key = `ssh@${profile.options.host}:${profile.options.port}`
         }
-        return key
+        return `${this.keychainPrefix}${key}`
     }
 
     private getKeytarKeyForPrivateKey (id: string): string {
-        return `ssh-private-key:${id}`
+        return `${this.keychainPrefix}ssh-private-key:${id}`
     }
 
     private getVaultKeyForConnection (profile: SSHProfile, username?: string) {

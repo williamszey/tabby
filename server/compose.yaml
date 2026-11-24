@@ -1,0 +1,26 @@
+name: tabby-auth
+services:
+  tabby-auth:
+    image: node:24-alpine@sha256:116b800c3754b440ee0aa3ed2f20f5bf3d99a554bfd9adeea09ea8017f6e85f5
+    command: ["node", "/app/auth.mjs"]
+    user: "1000:1000"
+    restart: unless-stopped
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    mem_limit: 384m
+    environment:
+      TABBY_AUTH_HOST: 0.0.0.0
+      TABBY_AUTH_PROXY_IP: 172.30.73.2
+    volumes:
+      - ./auth.mjs:/app/auth.mjs:ro
+      - ./state:/var/lib/tabby-auth
+    networks: [topperapi]
+    logging:
+      options:
+        max-size: "5m"
+        max-file: "2"
+networks:
+  topperapi:
+    external: true
+    name: topperapi_default

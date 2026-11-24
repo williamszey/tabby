@@ -174,10 +174,10 @@ ul.nav-tabs(ngbNav, #nav='ngbNav')
                     .title(translate) Password
                     .description(*ngIf='!hasSavedPassword', translate) Save a password in the keychain
                     .description(*ngIf='hasSavedPassword', translate) There is a saved password for this connection
-                button.btn.btn-success.ms-4(*ngIf='!hasSavedPassword', (click)='setPassword()')
+                button.btn.btn-success.ms-4(*ngIf='!hasSavedPassword', [disabled]='passwordBusy', (click)='setPassword()')
                     i.fas.fa-key
                     span(translate) Set password
-                button.btn.btn-danger.ms-4(*ngIf='hasSavedPassword', (click)='clearSavedPassword()')
+                button.btn.btn-danger.ms-4(*ngIf='hasSavedPassword', [disabled]='passwordBusy', (click)='clearSavedPassword()')
                     i.fas.fa-trash-alt
                     span(translate) Forget
 

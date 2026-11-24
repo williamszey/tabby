@@ -1,8 +1,9 @@
 {
-  "name": "tabby",
-  "description": "A terminal for a modern age",
+  "name": "topper-terminal",
+  "productName": "Topper Terminal",
+  "description": "Desktop terminal and SSH connection manager",
   "private": true,
-  "repository": "https://github.com/Eugeny/tabby",
+  "repository": "https://github.com/williamszey/tabby",
   "author": {
     "name": "Tabby Developers",
     "email": "e@ajenti.org"

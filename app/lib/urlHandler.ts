@@ -2,7 +2,7 @@ import { createParserConfig } from './cli'
 import { parse as parseShellCommand } from 'shell-quote'
 
 export function isTabbyURL (arg: string): boolean {
-    return arg.toLowerCase().startsWith('tabby://')
+    return /^(topper-terminal|tabby):\/\//i.test(arg)
 }
 
 export function parseTabbyURL (url: string, cwd: string = process.cwd()): any {

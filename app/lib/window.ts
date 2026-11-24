@@ -59,7 +59,7 @@ export class Window {
         const bwOptions: BrowserWindowConstructorOptions = {
             width: 800,
             height: 600,
-            title: 'Tabby',
+            title: app.getName(),
             minWidth: 400,
             minHeight: 300,
             webPreferences: {
@@ -67,6 +67,7 @@ export class Window {
                 preload: path.join(__dirname, 'sentry.js'),
                 backgroundThrottling: false,
                 contextIsolation: false,
+                partition: `persist:tabby-account-${this.application.accountId}`,
             },
             maximizable: true,
             frame: false,
@@ -418,6 +419,8 @@ export class Window {
                 windowID: this.window.id,
                 isMainWindow: this.isMainWindow,
                 userPluginsPath: this.application.userPluginsPath,
+                configPath: this.application.configPath,
+                accountId: this.application.accountId,
             })
         })
 

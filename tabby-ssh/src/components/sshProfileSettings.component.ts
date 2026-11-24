@@ -4,7 +4,7 @@ import { Component, ViewChild } from '@angular/core'
 import { NgbModal } from '@ng-bootstrap/ng-bootstrap'
 import { firstBy } from 'thenby'
 
-import { FileProvidersService, Platform, PlatformService, HostAppService, PromptModalComponent, PartialProfile, ProfilesService, ProfileSettingsComponent, FullyDefined, ProxifiedConfig, TranslateService } from 'tabby-core'
+import { FileProvidersService, NotificationsService, Platform, PlatformService, HostAppService, PromptModalComponent, PartialProfile, ProfilesService, ProfileSettingsComponent, FullyDefined, ProxifiedConfig, TranslateService } from 'tabby-core'
 import { LoginScriptsSettingsComponent } from 'tabby-terminal'
 import { PasswordStorageService } from '../services/passwordStorage.service'
 import { ForwardedPortConfig, SSHAlgorithmType, SSHProfile } from '../api'
@@ -19,6 +19,7 @@ export class SSHProfileSettingsComponent implements ProfileSettingsComponent<SSH
     Platform = Platform
     profile: ProxifiedConfig<FullyDefined<SSHProfile>>
     hasSavedPassword: boolean
+    passwordBusy = false
 
     connectionMode: 'direct'|'proxyCommand'|'jumpHost'|'socksProxy'|'httpProxy' = 'direct'
 
@@ -35,6 +36,7 @@ export class SSHProfileSettingsComponent implements ProfileSettingsComponent<SSH
         private fileProviders: FileProvidersService,
         private platform: PlatformService,
         private translate: TranslateService,
+        private notifications: NotificationsService,
     ) { }
 
     async ngOnInit () {
@@ -76,6 +78,7 @@ export class SSHProfileSettingsComponent implements ProfileSettingsComponent<SSH
         const modal = this.ngbModal.open(PromptModalComponent)
         modal.componentInstance.prompt = `Password for ${this.profile.options.user}@${this.profile.options.host}`
         modal.componentInstance.password = true
+        this.passwordBusy = true
         try {
             const result = await modal.result.catch(() => null)
             // Allow saving a blank password (servers with PermitEmptyPasswords),
@@ -89,9 +92,13 @@ export class SSHProfileSettingsComponent implements ProfileSettingsComponent<SSH
             if (result.value === '' && !await this.confirmBlankPassword()) {
                 return
             }
-            this.passwordStorage.savePassword(this.profile, result.value)
+            await this.passwordStorage.savePassword(this.profile, result.value)
             this.hasSavedPassword = true
-        } catch { }
+        } catch {
+            this.notifications.error(this.translate.instant(_('Could not save SSH password')))
+        } finally {
+            this.passwordBusy = false
+        }
     }
 
     private async confirmBlankPassword (): Promise<boolean> {
@@ -108,9 +115,16 @@ export class SSHProfileSettingsComponent implements ProfileSettingsComponent<SSH
         })).response === 0
     }
 
-    clearSavedPassword () {
-        this.hasSavedPassword = false
-        this.passwordStorage.deletePassword(this.profile)
+    async clearSavedPassword () {
+        this.passwordBusy = true
+        try {
+            await this.passwordStorage.deletePassword(this.profile)
+            this.hasSavedPassword = false
+        } catch {
+            this.notifications.error(this.translate.instant(_('Could not remove saved SSH password')))
+        } finally {
+            this.passwordBusy = false
+        }
     }
 
     async addPrivateKey () {

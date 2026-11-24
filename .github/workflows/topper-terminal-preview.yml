@@ -1,0 +1,54 @@
+name: Topper Terminal Windows installer
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [topper-terminal-preview]
+
+permissions:
+  contents: read
+
+jobs:
+  windows-x64:
+    runs-on: windows-2022
+    env:
+      ARCH: x64
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Prepare build tools
+        run: |
+          git fetch --no-tags https://github.com/Eugeny/tabby.git tag v1.0.238
+          npm install --global yarn@1.22.22
+          Invoke-WebRequest https://aka.ms/vs/17/release/vc_redist.x64.exe -OutFile build/vc_redist.exe
+      - name: Build the Windows elevation helper
+        run: |
+          $vswhere = "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe"
+          $msbuild = & $vswhere -latest -requires Microsoft.Component.MSBuild -find MSBuild\**\Bin\MSBuild.exe | Select-Object -First 1
+          if (-not $msbuild) { throw "MSBuild not found" }
+          & $msbuild tabby-uac\UAC.sln /p:Configuration=Release /p:Platform=x64 /p:PlatformToolset=v143 /p:WindowsTargetPlatformVersion=10.0 /verbosity:minimal
+          if ($LASTEXITCODE -ne 0) { throw "UAC build failed" }
+          $helper = Get-ChildItem tabby-uac -Recurse -Filter UAC.exe |
+            Where-Object { $_.FullName -match '\\Release\\' } | Select-Object -First 1
+          if (-not $helper) { throw "UAC.exe was not built" }
+          Copy-Item $helper.FullName extras\UAC.exe
+      - name: Build and test
+        run: |
+          yarn install --frozen-lockfile --network-timeout 180000
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          yarn run build
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          node --test server/auth.test.mjs
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          node scripts/prepackage-plugins.mjs
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          node scripts/build-topper-terminal.mjs
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Topper-Terminal-Windows-x64
+          path: dist/Topper-Terminal-*-setup-x64.exe
+          if-no-files-found: error

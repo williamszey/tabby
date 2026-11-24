@@ -21,6 +21,7 @@ coverage
 npm-debug.log
 
 builtin-plugins
+/server/state/
 package-lock.json
 yarn-error.log
 

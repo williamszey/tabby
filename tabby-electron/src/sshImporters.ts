@@ -3,8 +3,8 @@ import * as fsSync from 'fs'
 import * as path from 'path'
 import * as glob from 'glob'
 import * as yaml from 'js-yaml'
-import { Injectable } from '@angular/core'
-import { PartialProfile } from 'tabby-core'
+import { Inject, Injectable } from '@angular/core'
+import { BOOTSTRAP_DATA, BootstrapData, PartialProfile } from 'tabby-core'
 import {
     SSHProfileImporter,
     PortForwardType,
@@ -439,11 +439,9 @@ export class OpenSSHImporter extends SSHProfileImporter {
 export class StaticFileImporter extends SSHProfileImporter {
     private configPath: string
 
-    constructor (
-        electron: ElectronService,
-    ) {
+    constructor (@Inject(BOOTSTRAP_DATA) bootstrapData: BootstrapData) {
         super()
-        this.configPath = path.join(electron.app.getPath('userData'), 'ssh-profiles.yaml')
+        this.configPath = path.join(path.dirname(bootstrapData.configPath!), 'ssh-profiles.yaml')
     }
 
     async getProfiles (): Promise<PartialProfile<SSHProfile>[]> {

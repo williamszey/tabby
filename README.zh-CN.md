@@ -19,6 +19,18 @@
 * [Repositories](https://packagecloud.io/eugeny/tabby): [Debian/Ubuntu-based](https://packagecloud.io/eugeny/tabby/install#bash-deb), [RPM-based](https://packagecloud.io/eugeny/tabby/install#bash-rpm)
 * [Latest nightly build](https://nightly.link/Eugeny/tabby/workflows/build/master)
 
+### Topper Terminal 桌面端
+
+首次启动时点 **创建账号**，用邮箱和至少 12 个字符的密码注册。下次启动时用同一邮箱和密码登录。账号由 `topperapi.com` 验证，服务器以加盐哈希保存密码。目前注册不需要邮箱验证码。
+
+登录后，在 **设置 → 配置和连接 → 新配置** 中选择 **SSH 连接**。填写服务器 IP 或主机名、端口和 SSH 用户名，在认证方式中选择 **密码**，点 **设置密码** 后保存配置。之后可从连接列表打开该配置。SSH 连接按账号保存在本机，SSH 密码存入系统钥匙串，启用 Tabby 密码库时存入密码库。
+
+本分支的源码构建步骤见 [HACKING.md](HACKING.md)。如果 Fork 缺少版本标签，先运行 `git fetch https://github.com/Eugeny/tabby.git tag v1.0.238`。
+
+桌面端向 `topperapi.com` 的 `/api/tabby/register` 和 `/api/tabby/login` 发送 `POST` 请求，JSON 字段为 `email` 和 `password`。注册成功返回 `201`，登录成功返回 `204`，两者通过 `X-Tabby-Account` 返回同一账号标识。服务端部署文件位于 [server](server/)。
+
+在目标平台完成源码构建后，运行 `node scripts/prepackage-plugins.mjs` 和 `node scripts/build-topper-terminal.mjs`，安装包输出到 `dist/`。Topper Terminal 使用 [网站图标](https://topperapi.com/portal-assets/topper-mark-v2.svg)，安装包随附 Tabby 的 MIT 许可证。
+
 <br/>
 <p align="center">
 本 README 还适用于以下语言: <a  href="./README.md">:gb: English</a> · <a  href="./README.es-ES.md">:es: Spanish</a> · <a  href="./README.ru-RU.md">:ru: Русский</a> · <a  href="./README.ko-KR.md">:kr: 한국어</a> · <a  href="./README.it-IT.md">:it: Italiano</a> · <a href="./README.de-DE.md">:de: Deutsch</a> · <a href="./README.ja-JP.md">:jp: 日本語</a> · <a href="./README.id-ID.md">:id: Bahasa Indonesia</a> · <a href="./README.pt-BR.md">:brazil: Português</a> · <a href="./README.pl-PL.md">:poland: Polski</a>

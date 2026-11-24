@@ -40,7 +40,7 @@ profileDefaults:
   ssh:
     disableDynamicTitle: true
 recoverTabs: true
-enableAnalytics: true
+enableAnalytics: false
 enableWelcomeTab: true
 electronFlags: []
 enableAutomaticUpdates: true

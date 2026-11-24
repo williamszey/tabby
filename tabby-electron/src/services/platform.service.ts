@@ -4,13 +4,12 @@ import * as fsSync from 'fs'
 import * as os from 'os'
 import promiseIpc, { RendererProcessType } from 'electron-promise-ipc'
 import { execFile } from 'mz/child_process'
-import { Injectable, NgZone } from '@angular/core'
-import { PlatformService, ClipboardContent, Platform, MenuItemOptions, MessageBoxOptions, MessageBoxResult, DirectoryUpload, FileUpload, FileDownload, DirectoryDownload, FileUploadOptions, wrapPromise, TranslateService, FileTransfer, PlatformTheme } from 'tabby-core'
+import { Inject, Injectable, NgZone } from '@angular/core'
+import { PlatformService, ClipboardContent, Platform, MenuItemOptions, MessageBoxOptions, MessageBoxResult, DirectoryUpload, FileUpload, FileDownload, DirectoryDownload, FileUploadOptions, wrapPromise, TranslateService, FileTransfer, PlatformTheme, BOOTSTRAP_DATA, BootstrapData } from 'tabby-core'
 import { ElectronService } from '../services/electron.service'
 import { ElectronHostWindow } from './hostWindow.service'
 import { ShellIntegrationService } from './shellIntegration.service'
 import { ElectronHostAppService } from './hostApp.service'
-import { configPath } from '../../../app/lib/config'
 const fontManager = require('fontmanager-redux') // eslint-disable-line
 
 /* eslint-disable block-scoped-var */
@@ -48,9 +47,10 @@ export class ElectronPlatformService extends PlatformService {
         private zone: NgZone,
         private shellIntegration: ShellIntegrationService,
         private translate: TranslateService,
+        @Inject(BOOTSTRAP_DATA) bootstrapData: BootstrapData,
     ) {
         super()
-        this.configPath = configPath
+        this.configPath = bootstrapData.configPath!
 
         electron.ipcRenderer.on('host:display-metrics-changed', () => {
             this.zone.run(() => this.displayMetricsChanged.next())

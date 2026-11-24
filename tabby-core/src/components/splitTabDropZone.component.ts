@@ -21,8 +21,8 @@ import { SplitDropZoneInfo, SplitTabComponent } from './splitTab.component'
     styleUrls: ['./splitTabDropZone.component.scss'],
 })
 export class SplitTabDropZoneComponent extends SelfPositioningComponent {
-    @Input() dropZone: SplitDropZoneInfo
-    @Input() parent: SplitTabComponent
+    @Input() dropZone?: SplitDropZoneInfo
+    @Input() parent?: SplitTabComponent
     @Output() tabDropped = new EventEmitter<BaseTabComponent>()
     @HostBinding('class.active') isActive = false
     @HostBinding('class.highlighted') isHighlighted = false
@@ -40,6 +40,9 @@ export class SplitTabDropZoneComponent extends SelfPositioningComponent {
     }
 
     canActivateFor (tab: BaseTabComponent): boolean {
+        if (!this.parent || !this.dropZone) {
+            return false
+        }
         const allTabs = this.parent.getAllTabs()
         return !(
             tab === this.parent ||
@@ -54,6 +57,9 @@ export class SplitTabDropZoneComponent extends SelfPositioningComponent {
     }
 
     layout () {
+        if (!this.dropZone) {
+            return
+        }
         this.setDimensions(
             this.dropZone.x,
             this.dropZone.y,
