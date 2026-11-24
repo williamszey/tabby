@@ -5,7 +5,7 @@ if (!mac && process.platform !== 'win32') {
     throw new Error('Build the macOS and Windows installers on their respective platforms')
 }
 
-const version = process.env.TOPPER_TERMINAL_VERSION ?? '1.0.0-beta.1'
+const version = process.env.TOPPER_TERMINAL_VERSION ?? '1.0.0-beta.2'
 const arch = process.arch === 'arm64' ? Arch.arm64 : Arch.x64
 const config = {
     extends: './electron-builder.yml',

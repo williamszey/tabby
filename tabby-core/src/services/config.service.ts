@@ -463,6 +463,19 @@ export class ConfigService {
             }
             config.version = 8
         }
+        if (config.version < 9) {
+            const bindings: unknown = config.hotkeys?.['toggle-window']
+            const isLegacyShortcut = (binding: unknown) => {
+                const key = Array.isArray(binding) ? binding[0] : binding
+                return typeof key === 'string' && /^(ctrl|control)[-+]space$/i.test(key.replace(/\s/g, ''))
+            }
+            if (typeof bindings === 'string' && isLegacyShortcut(bindings)) {
+                config.hotkeys['toggle-window'] = []
+            } else if (Array.isArray(bindings)) {
+                config.hotkeys['toggle-window'] = bindings.filter(binding => !isLegacyShortcut(binding))
+            }
+            config.version = 9
+        }
     }
 
     private async maybeDecryptConfig (store) {
