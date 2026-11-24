@@ -10,6 +10,7 @@ const arch = process.arch === 'arm64' ? Arch.arm64 : Arch.x64
 const config = {
     extends: './electron-builder.yml',
     extraMetadata: { version },
+    publish: null,
 }
 
 if (process.env.TOPPER_TERMINAL_ELECTRON_DIST) {
@@ -19,7 +20,7 @@ if (process.env.TOPPER_TERMINAL_ELECTRON_DIST) {
 if (mac) {
     const release = process.env.TOPPER_TERMINAL_SIGN === '1'
     config.forceCodeSigning = release
-    config.mac = release ? { notarize: true } : { identity: '-', notarize: false }
+    config.mac = release ? { notarize: true } : { identity: '-', hardenedRuntime: false, notarize: false }
 } else {
     config.forceCodeSigning = process.env.TOPPER_TERMINAL_SIGN === '1'
 }

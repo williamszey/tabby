@@ -1,9 +1,11 @@
 import { Injectable } from '@angular/core'
+import { existsSync } from 'fs'
+import { join } from 'path'
 
 import { Logger, LogService, ConfigService, UpdaterService, PlatformService, TranslateService } from 'tabby-core'
 import { ElectronService } from '../services/electron.service'
 
-const UPDATES_URL = 'https://api.github.com/repos/eugeny/tabby/releases/latest'
+const UPDATES_URL = 'https://api.github.com/repos/williamszey/tabby/releases/latest'
 
 @Injectable()
 export class ElectronUpdaterService extends UpdaterService {
@@ -22,7 +24,7 @@ export class ElectronUpdaterService extends UpdaterService {
         super()
         this.logger = log.create('updater')
 
-        if (process.platform === 'linux' || process.env.PORTABLE_EXECUTABLE_FILE) {
+        if (process.platform === 'linux' || process.env.PORTABLE_EXECUTABLE_FILE || !existsSync(join(process.resourcesPath, 'app-update.yml'))) {
             this.electronUpdaterAvailable = false
             return
         }
@@ -101,8 +103,14 @@ export class ElectronUpdaterService extends UpdaterService {
         } else {
             this.logger.debug('Checking for updates through fallback method.')
             const response = await fetch(UPDATES_URL)
+            if (response.status === 404) {
+                return false
+            }
+            if (!response.ok) {
+                throw new Error(`Could not check for updates (${response.status})`)
+            }
             const data = await response.json()
-            const version = data.tag_name.substring(1)
+            const version = data.tag_name.replace(/^v/, '')
             if (this.electron.app.getVersion() !== version) {
                 this.logger.info('Update available')
                 this.updateURL = data.html_url
