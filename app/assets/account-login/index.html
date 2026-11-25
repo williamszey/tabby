@@ -4,28 +4,48 @@
     <meta charset="utf-8">
     <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self'; form-action 'none'; base-uri 'none'">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>Topper Terminal 登录</title>
+    <title>TopperTerminal 登录</title>
     <link rel="stylesheet" href="login.css">
     <script defer src="login.js"></script>
 </head>
 <body>
-    <main>
-        <div class="brand"><img src="../topper-terminal.png" alt="" width="24" height="24"> Topper Terminal</div>
-        <h1>登录终端</h1>
-        <p id="description">使用 Topper Terminal 账号登录。</p>
-        <form>
-            <label for="email">邮箱</label>
-            <input id="email" name="email" type="email" autocomplete="username" maxlength="254" required autofocus>
-            <label for="password">密码</label>
-            <input id="password" name="password" type="password" autocomplete="current-password" maxlength="256" required>
-            <div id="confirmation-field" hidden>
-                <label for="confirm-password">再次输入密码</label>
-                <input id="confirm-password" type="password" autocomplete="new-password" maxlength="256">
+    <main aria-labelledby="heading">
+        <header>
+            <div class="brand"><img src="../topper-terminal.png" alt="" width="36" height="36"><span>TopperTerminal</span></div>
+            <h1 id="heading">登录终端</h1>
+            <p id="description">登录后管理和连接你的 SSH 服务器。</p>
+        </header>
+        <form novalidate>
+            <div class="field">
+                <label for="email">邮箱</label>
+                <input id="email" name="email" type="email" autocomplete="username" maxlength="254" autocapitalize="off" spellcheck="false" placeholder="name@example.com" required autofocus>
             </div>
+            <div class="field">
+                <label for="password">密码</label>
+                <div class="password-field">
+                    <input id="password" name="password" type="password" autocomplete="current-password" maxlength="256" required>
+                    <button class="visibility" type="button" aria-controls="password" aria-label="显示密码" aria-pressed="false">显示</button>
+                </div>
+                <p id="password-hint" class="field-hint" hidden>至少 12 个字符</p>
+            </div>
+            <div id="confirmation-field" class="field" hidden>
+                <label for="confirm-password">再次输入密码</label>
+                <div class="password-field">
+                    <input id="confirm-password" type="password" autocomplete="new-password" maxlength="256">
+                    <button class="visibility" type="button" aria-controls="confirm-password" aria-label="显示确认密码" aria-pressed="false">显示</button>
+                </div>
+            </div>
+            <label class="import-choice" id="import-choice" hidden>
+                <input id="import-local" type="checkbox">
+                将本机 SSH 连接加入此账号
+            </label>
             <p id="status" role="status" aria-live="polite"></p>
             <button id="submit" type="submit" disabled>登录</button>
-            <button id="switch-mode" type="button" disabled>注册</button>
         </form>
+        <footer>
+            <span id="mode-hint">还没有账号？</span>
+            <button id="switch-mode" type="button" disabled>注册</button>
+        </footer>
     </main>
 </body>
 </html>

@@ -19,7 +19,7 @@ import { X11Socket } from './x11'
 import { supportedAlgorithms } from '../algorithms'
 import { requestShellPTY, SSHShellChannelOptions } from './shellChannel'
 import * as russh from 'russh'
-import { selectNextAuthMethod, updateAuthPlanAfterFailure } from './authMethodSelection'
+import { AuthenticationFailure, selectNextAuthMethod, updateAuthPlanAfterFailure } from './authMethodSelection'
 import { bridgeSocketToChannel } from './socketChannel'
 
 const WINDOWS_OPENSSH_AGENT_PIPE = '\\\\.\\pipe\\openssh-ssh-agent'
@@ -85,7 +85,9 @@ export class KeyboardInteractivePrompt {
     }
 
     isAPasswordPrompt (index: number): boolean {
-        return this.prompts[index].prompt.toLowerCase().includes('password') && !this.prompts[index].echo
+        const { prompt, echo } = this.prompts[index]
+        return !echo && /\bpassword\b/i.test(prompt) &&
+            !/\b(?:one[- ]time|otp|verification|token)\b/i.test(prompt)
     }
 
     respond (): void {
@@ -116,6 +118,7 @@ export class SSHSession {
     private logger: Logger
     private refCount = 0
     private allAuthMethods: AuthMethod[] = []
+    private storedPassword: string|null = null
     private serviceMessage = new Subject<string>()
     private keyboardInteractivePrompt = new Subject<KeyboardInteractivePrompt>()
     private willDestroy = new Subject<void>()
@@ -275,30 +278,22 @@ export class SSHSession {
             return
         }
 
-        const storedPassword = await this.passwordStorage.loadPassword(this.profile, this.authUsername)
+        const storedPassword = this.storedPassword = await this.passwordStorage.loadPassword(this.profile, this.authUsername)
         if (storedPassword == null) {
             return
         }
 
-        if (!this.profile.options.auth || this.profile.options.auth === 'password') {
-            const hasSavedPassword = this.allAuthMethods.some(method => method.type === 'saved-password' && method.password === storedPassword)
-            if (!hasSavedPassword) {
-                const promptIndex = this.allAuthMethods.findIndex(method => method.type === 'prompt-password')
-                const insertIndex = promptIndex >= 0 ? promptIndex : this.allAuthMethods.length
-                this.allAuthMethods.splice(insertIndex, 0, { type: 'saved-password', password: storedPassword })
-            }
+        // Inline passwords are a fallback for profiles without a credential in secure storage.
+        this.allAuthMethods = this.allAuthMethods.filter(method =>
+            method.type !== 'saved-password' && (method.type !== 'keyboard-interactive' || method.savedPassword === undefined),
+        )
+        const interactive = this.allAuthMethods.find(method => method.type === 'keyboard-interactive')
+        if (interactive?.type === 'keyboard-interactive') {
+            interactive.savedPassword = storedPassword
         }
-
-        if (!this.profile.options.auth || this.profile.options.auth === 'keyboardInteractive') {
-            const existingSaved = this.allAuthMethods.find(method => method.type === 'keyboard-interactive' && method.savedPassword === storedPassword)
-            if (!existingSaved) {
-                const updatable = this.allAuthMethods.find(method => method.type === 'keyboard-interactive' && method.savedPassword === undefined)
-                if (updatable && updatable.type === 'keyboard-interactive') {
-                    updatable.savedPassword = storedPassword
-                } else {
-                    this.allAuthMethods.push({ type: 'keyboard-interactive', savedPassword: storedPassword })
-                }
-            }
+        const promptIndex = this.allAuthMethods.findIndex(method => method.type === 'prompt-password')
+        if (promptIndex >= 0) {
+            this.allAuthMethods.splice(promptIndex, 0, { type: 'saved-password', password: storedPassword })
         }
     }
 
@@ -493,8 +488,8 @@ export class SSHSession {
         if (authenticatedClient) {
             this.ssh = authenticatedClient
         } else {
+            this.savedPassword = undefined
             this.ssh.disconnect().catch(() => null)
-            this.passwordStorage.deletePassword(this.profile, this.authUsername ?? undefined)
             // eslint-disable-next-line @typescript-eslint/no-base-to-string
             throw new Error('Authentication rejected')
         }
@@ -502,7 +497,13 @@ export class SSHSession {
         // auth success
 
         if (this.savedPassword != null) {
-            this.passwordStorage.savePassword(this.profile, this.savedPassword, this.authUsername ?? undefined)
+            try {
+                await this.passwordStorage.savePassword(this.profile, this.savedPassword, this.authUsername ?? undefined)
+            } catch {
+                this.notifications.error(this.translate.instant(_('Could not save SSH password')))
+            } finally {
+                this.savedPassword = undefined
+            }
         }
 
         for (const fwConfig of this.profile.options.forwardedPorts) {
@@ -567,7 +568,7 @@ export class SSHSession {
             } catch (e) {
                 // eslint-disable-next-line @typescript-eslint/no-base-to-string
                 this.emitServiceMessage(colors.bgRed.black(' X ') + ` Could not connect to the X server: ${e}`)
-                this.emitServiceMessage(`    Tabby tried to connect to ${JSON.stringify(X11Socket.resolveDisplaySpec(displaySpec))} based on the DISPLAY environment var (${displaySpec})`)
+                this.emitServiceMessage(`    TopperTerminal tried to connect to ${JSON.stringify(X11Socket.resolveDisplaySpec(displaySpec))} based on the DISPLAY environment var (${displaySpec})`)
                 if (process.platform === 'win32') {
                     this.emitServiceMessage('    To use X forwarding, you need a local X server, e.g.:')
                     this.emitServiceMessage('    * VcXsrv: https://sourceforge.net/projects/vcxsrv/')
@@ -662,6 +663,7 @@ export class SSHSession {
     // eslint-disable-next-line max-statements
     private async _handleAuth (): Promise<russh.AuthenticatedSSHClient|null> {
         this.activePrivateKey = null
+        this.savedPassword = undefined
 
         if (!(this.ssh instanceof russh.SSHClient)) {
             throw new Error('Wrong state for auth handling')
@@ -678,8 +680,9 @@ export class SSHSession {
 
         let remainingMethods = [...this.allAuthMethods]
         let methodsLeft = noneResult.remainingMethods
+        let storedPasswordRejected = false
 
-        const updateAuthPlan = (failure: russh.AuthFailure) => {
+        const updateAuthPlan = (failure: AuthenticationFailure) => {
             const plan = updateAuthPlanAfterFailure(
                 remainingMethods,
                 failure,
@@ -707,29 +710,27 @@ export class SSHSession {
                 if (result instanceof russh.AuthenticatedSSHClient) {
                     return result
                 }
-                updateAuthPlan(result)
+                const failure: AuthenticationFailure = result
+                storedPasswordRejected = !failure.partialSuccess && method.password === this.storedPassword
+                updateAuthPlan(failure)
             }
             if (method.type === 'prompt-password') {
                 const modal = this.ngbModal.open(PromptModalComponent)
                 modal.componentInstance.prompt = `Password for ${this.authUsername}@${this.profile.options.host}`
                 modal.componentInstance.password = true
-                modal.componentInstance.showRememberCheckbox = true
-                const prefilledPassword = await this.passwordStorage.loadPassword(this.profile, this.authUsername)
-                if (prefilledPassword != null) {
-                    modal.componentInstance.value = prefilledPassword
-                }
-
                 try {
                     const promptResult = await modal.result.catch(() => null)
                     if (promptResult) {
-                        if (promptResult.remember) {
-                            this.savedPassword = promptResult.value
-                        }
                         const result = await this.ssh.authenticateWithPassword(this.authUsername, promptResult.value)
                         if (result instanceof russh.AuthenticatedSSHClient) {
+                            this.savedPassword = promptResult.value
                             return result
                         }
-                        updateAuthPlan(result)
+                        const failure: AuthenticationFailure = result
+                        if (failure.partialSuccess) {
+                            this.savedPassword = promptResult.value
+                        }
+                        updateAuthPlan(failure)
                     } else {
                         continue
                     }
@@ -753,10 +754,16 @@ export class SSHSession {
             }
             if (method.type === 'keyboard-interactive') {
                 let state: russh.AuthenticatedSSHClient|russh.KeyboardInteractiveAuthenticationState = await this.ssh.startKeyboardInteractiveAuthentication(this.authUsername)
+                let passwordToRemember: string|undefined = undefined
+                let passwordPromptSeen = false
 
                 while (true) {
                     if (state.state === 'failure') {
-                        updateAuthPlan(state)
+                        const failure: AuthenticationFailure = state
+                        if (failure.partialSuccess && passwordToRemember !== undefined) {
+                            this.savedPassword = passwordToRemember
+                        }
+                        updateAuthPlan(failure)
                         break
                     }
 
@@ -772,15 +779,11 @@ export class SSHSession {
                             state.prompts(),
                         )
 
-                        if (method.savedPassword != null) {
-                            // eslint-disable-next-line max-depth
-                            for (let i = 0; i < prompt.prompts.length; i++) {
-                                // eslint-disable-next-line max-depth
-                                if (prompt.isAPasswordPrompt(i)) {
-                                    prompt.responses[i] = method.savedPassword
-                                }
-                            }
+                        const passwordIndex = prompt.prompts.findIndex((_prompt, index) => prompt.isAPasswordPrompt(index))
+                        if (passwordIndex >= 0 && !passwordPromptSeen && !storedPasswordRejected && method.savedPassword != null) {
+                            prompt.responses[passwordIndex] = method.savedPassword
                         }
+                        passwordPromptSeen ||= passwordIndex >= 0
 
                         this.emitKeyboardInteractivePrompt(prompt)
 
@@ -790,11 +793,15 @@ export class SSHSession {
                         } catch {
                             break // this loop
                         }
+                        passwordToRemember = responses[passwordIndex] ?? passwordToRemember
                     }
 
                     state = await this.ssh.continueKeyboardInteractiveAuthentication(responses)
 
                     if (state instanceof russh.AuthenticatedSSHClient) {
+                        if (passwordToRemember !== undefined) {
+                            this.savedPassword = passwordToRemember
+                        }
                         return state
                     }
                 }

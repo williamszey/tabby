@@ -477,6 +477,24 @@ export class ConfigService {
             }
             config.version = 10
         }
+        if (config.version < 11) {
+            const defaults = new Map([
+                ['Tabby Default', 'TopperTerminal Default'],
+                ['Tabby Default Light', 'TopperTerminal Default Light'],
+            ])
+            const rename = (scheme) => {
+                const name = defaults.get(scheme?.name)
+                if (name) {
+                    scheme.name = name
+                }
+            }
+            rename(config.terminal?.colorScheme)
+            rename(config.terminal?.lightColorScheme)
+            for (const profile of [...config.profiles ?? [], ...Object.values(config.profileDefaults ?? {})]) {
+                rename(profile?.terminalColorScheme)
+            }
+            config.version = 11
+        }
     }
 
     private async maybeDecryptConfig (store) {

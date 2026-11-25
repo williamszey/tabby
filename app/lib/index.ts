@@ -1,7 +1,7 @@
 // Registers main-process error logging - must be first so it catches import-time errors
 import { logMainError } from './errors'
 
-import { app, BrowserWindow, ipcMain, Menu, dialog } from 'electron'
+import { app, BrowserWindow, ipcMain, Menu, dialog, session } from 'electron'
 import { execFile } from 'child_process'
 import { mkdir } from 'fs/promises'
 import * as path from 'path'
@@ -23,6 +23,9 @@ import electronDebug from 'electron-debug'
 import { loadConfig } from './config'
 import { AuthClient } from './authClient'
 import { AccountLogin } from './accountLogin'
+import { SSHCommandHistoryStore } from './sshCommandHistory'
+import { SSHCredentials } from './sshCredentials'
+import { hasLocalSSHProfiles, importLocalSSHProfiles, localWorkspaceDirectory } from './localWorkspace'
 
 const argv = parseArgs(process.argv, process.cwd())
 
@@ -95,18 +98,18 @@ app.on('second-instance', (_event, newArgv, cwd) => {
     dispatchInvocation(newArgv, cwd)
 })
 
+function relaunchWorkspace (): void {
+    const portable = process.env.PORTABLE_EXECUTABLE_FILE
+    app.relaunch(portable ? { execPath: portable } : {})
+    app.exit()
+}
+
 app.on('ready', async () => {
     try {
-        const auth = new AuthClient(process.env.TABBY_CONFIG_DIRECTORY!, process.env.TABBY_DEV ? process.env.TABBY_AUTH_BASE_URL : undefined)
-        let accountId = await auth.restoreSession()
-        if (!accountId) {
-            accountLogin = new AccountLogin(auth)
-            accountId = await accountLogin.result
-        }
-        if (!accountId) {
-            app.quit()
-            return
-        }
+        const directory = process.env.TABBY_CONFIG_DIRECTORY!
+        const origin = process.env.TABBY_DEV ? process.env.TABBY_AUTH_BASE_URL : undefined
+        const auth = new AuthClient(directory, origin)
+        const accountId = await auth.restoreSession()
 
         if (argv.d) {
             electronDebug({
@@ -116,26 +119,111 @@ app.on('ready', async () => {
             })
         }
 
-        const accountDirectory = path.join(process.env.TABBY_CONFIG_DIRECTORY!, 'accounts', accountId)
+        const accountDirectory = accountId ? path.join(directory, 'accounts', accountId) : localWorkspaceDirectory(directory)
         await mkdir(accountDirectory, { recursive: true, mode: 0o700 })
-        application = new Application(accountId, accountDirectory)
+        const credentials = new SSHCredentials(path.join(accountDirectory, 'ssh-credentials.bin'))
+        await credentials.unlock().catch(() => console.warn('Could not unlock the SSH credential store'))
+        application = new Application(accountId, accountDirectory, auth.accountEmail)
+        const accountSession = session.fromPartition(application.sessionPartition)
+        ipcMain.handle('app:ssh-credentials:get', (event, key) => {
+            if (event.sender.session === accountSession && typeof key === 'string' && key.length <= 2048) {
+                return credentials.get(key)
+            }
+            return undefined
+        })
+        ipcMain.handle('app:ssh-credentials:set', (event, key, password, onlyIfMissing) => {
+            if (event.sender.session === accountSession && typeof key === 'string' && key.length <= 2048 &&
+                (password === null || (typeof password === 'string' && password.length <= 16_384))) {
+                return credentials.set(key, password, onlyIfMissing === true)
+            }
+            return false
+        })
+        const commandHistory = new SSHCommandHistoryStore(credentials)
+        ipcMain.handle('app:ssh-recent-commands', (event, profileId, command, favorite) => {
+            if (event.sender.session !== accountSession || typeof profileId !== 'string' ||
+                !/^[^\u0000-\u001f]{1,256}$/.test(profileId)) {
+                return { recent: [], favorites: [] }
+            }
+            return command === undefined ? commandHistory.get(profileId) : commandHistory.update(profileId, command, favorite)
+        })
+        let cloudSync = Promise.resolve()
+        ipcMain.handle('app:ssh-cloud-sync', async (event, profiles, fingerprints) => {
+            if (event.sender.session !== accountSession) {
+                return { status: 'unavailable' }
+            }
+            if (!accountId) {
+                return { status: 'local' }
+            }
+            const ids = Array.isArray(profiles) && profiles.length <= 200
+                ? profiles.map(profile => profile?.id).filter(id => typeof id === 'string' && /^[^\u0000-\u001f]{1,256}$/.test(id))
+                : []
+            const sync = cloudSync.then(async () => {
+                const history = await commandHistory.snapshot(ids)
+                const result = await auth.syncSSHConnections(profiles, fingerprints, history)
+                if (result.status === 'active' && result.history) {
+                    for (const [id, commands] of result.history) {
+                        await commandHistory.accept(id, commands)
+                    }
+                    delete result.history
+                }
+                return result
+            })
+            cloudSync = sync.then(() => undefined, () => undefined)
+            return sync
+        })
+        ipcMain.handle('app:sign-in', async event => {
+            if (event.sender.session !== accountSession || accountLogin) {
+                return
+            }
+            const parent = BrowserWindow.fromWebContents(event.sender)
+            if (!parent) {
+                return
+            }
+            // Use a separate client so in-flight sync keeps using the current account during sign-in.
+            const login = new AccountLogin(new AuthClient(directory, origin), parent, !accountId && hasLocalSSHProfiles(directory))
+            accountLogin = login
+            try {
+                const result = await login.result
+                if (!result) {
+                    return
+                }
+                if (result.importLocal) {
+                    try {
+                        await importLocalSSHProfiles(directory, result.accountId)
+                    } catch (error) {
+                        logMainError('Could not import local SSH connections', error)
+                        login.close()
+                        await dialog.showMessageBox(parent, {
+                            type: 'warning',
+                            message: '本机 SSH 连接未能加入账号。',
+                            detail: '登录仍会继续。本机连接可在退出登录后查看。',
+                        })
+                    }
+                }
+                relaunchWorkspace()
+            } finally {
+                login.close()
+                accountLogin = undefined
+            }
+        })
         ipcMain.handle('app:sign-out', async event => {
+            if (!accountId || event.sender.session !== accountSession || accountLogin) {
+                return
+            }
             const parent = BrowserWindow.fromWebContents(event.sender)
             if (!parent) {
                 return
             }
             const result = await dialog.showMessageBox(parent, {
                 type: 'question',
-                message: '退出登录会关闭所有终端窗口。',
+                message: '退出登录会关闭当前 SSH 会话，并回到本机模式。',
                 buttons: ['取消', '退出登录'],
                 defaultId: 0,
                 cancelId: 0,
             })
             if (result.response === 1) {
                 await auth.clearSession()
-                const portable = process.env.PORTABLE_EXECUTABLE_FILE
-                app.relaunch(portable ? { execPath: portable } : {})
-                app.exit()
+                relaunchWorkspace()
             }
         })
         if (process.platform === 'darwin') {
@@ -145,10 +233,7 @@ app.on('ready', async () => {
         }
         application.init()
 
-        const opening = application.newWindow({ hidden: argv.hidden })
-        accountLogin?.close()
-        accountLogin = undefined
-        const window = await opening
+        const window = await application.newWindow({ hidden: argv.hidden })
         window.passCliArguments(process.argv, process.cwd(), false)
         window.focus()
         started = true

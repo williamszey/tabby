@@ -111,7 +111,7 @@ export class AppService {
 
         config.ready$.toPromise().then(async () => {
             if (this.bootstrapData.isMainWindow) {
-                if (!this.bootstrapData.accountId && config.store.recoverTabs) {
+                if (!this.bootstrapData.accountId && !this.bootstrapData.localWorkspace && config.store.recoverTabs) {
                     const tabs = await this.tabRecovery.recoverTabs()
                     for (const tab of tabs) {
                         this.openNewTabRaw(tab)

@@ -1,5 +1,6 @@
+import type { SSHCommandCollections } from 'tabby-core'
 import { Injectable, NgZone, Injector } from '@angular/core'
-import { isWindowsBuild, WIN_BUILD_FLUENT_BG_SUPPORTED, HostAppService, Platform, CLIHandler } from 'tabby-core'
+import { isWindowsBuild, WIN_BUILD_FLUENT_BG_SUPPORTED, HostAppService, Platform, CLIHandler, SSHCloudConnection, SSHCloudFingerprints, SSHCloudResult } from 'tabby-core'
 import { ElectronService } from '../services/electron.service'
 
 
@@ -66,8 +67,28 @@ export class ElectronHostAppService extends HostAppService {
         this.electron.ipcRenderer.send('app:ready')
     }
 
+    async signIn (): Promise<void> {
+        await this.electron.ipcRenderer.invoke('app:sign-in')
+    }
+
     async signOut (): Promise<void> {
         await this.electron.ipcRenderer.invoke('app:sign-out')
+    }
+
+    async syncSSHConnections (profiles?: SSHCloudConnection[], fingerprints?: SSHCloudFingerprints): Promise<SSHCloudResult> {
+        return this.electron.ipcRenderer.invoke('app:ssh-cloud-sync', profiles, fingerprints)
+    }
+
+    async sshRecentCommands (profileId: string, command?: string, favorite?: boolean): Promise<SSHCommandCollections> {
+        return this.electron.ipcRenderer.invoke('app:ssh-recent-commands', profileId, command, favorite)
+    }
+
+    async getSSHPassword (key: string): Promise<string | null | undefined> {
+        return this.electron.ipcRenderer.invoke('app:ssh-credentials:get', key)
+    }
+
+    async storeSSHPassword (key: string, password: string | null, onlyIfMissing?: boolean): Promise<boolean> {
+        return this.electron.ipcRenderer.invoke('app:ssh-credentials:set', key, password, onlyIfMissing)
     }
 
     relaunch (): void {

@@ -4,7 +4,7 @@ import { FormsModule } from '@angular/forms'
 import { NgbModule } from '@ng-bootstrap/ng-bootstrap'
 import { ToastrModule } from 'ngx-toastr'
 import { NgxFilesizeModule } from 'ngx-filesize'
-import TabbyCoreModule, { AppService, BOOTSTRAP_DATA, BootstrapData, CommandProvider, ConfigProvider, TabRecoveryProvider, HotkeyProvider, TabContextMenuItemProvider, ProfileProvider } from 'tabby-core'
+import TabbyCoreModule, { AppService, BOOTSTRAP_DATA, BootstrapData, CommandProvider, ConfigProvider, TabRecoveryProvider, HotkeyProvider, TabContextMenuItemProvider, ProfileProvider, ProfilesService, PartialProfile } from 'tabby-core'
 import { SettingsTabProvider } from 'tabby-settings'
 import TabbyTerminalModule from 'tabby-terminal'
 
@@ -29,6 +29,9 @@ import { SSHProfilesService } from './profiles'
 import { SFTPContextMenuItemProvider } from './api/contextMenu'
 import { CommonSFTPContextMenu } from './sftpContextMenu'
 import { SFTPCreateDirectoryModalComponent } from './components/sftpCreateDirectoryModal.component'
+import { SSHCloudSyncService } from './services/sshCloudSync.service'
+import { PasswordStorageService } from './services/passwordStorage.service'
+import { SSHProfile } from './api'
 
 /** @hidden */
 @NgModule({
@@ -73,9 +76,25 @@ export default class SSHModule {
     constructor (
         app: AppService,
         connections: SSHConnectionsCommand,
+        cloud: SSHCloudSyncService,
+        profiles: ProfilesService,
+        passwords: PasswordStorageService,
         @Inject(BOOTSTRAP_DATA) bootstrap: BootstrapData,
     ) {
         if (bootstrap.accountId) {
+            app.ready$.subscribe(() => {
+                if (bootstrap.isMainWindow) {
+                    void passwords.migrateLegacyPasswords(async () => {
+                        const saved = await profiles.getProfiles({ includeBuiltin: false, clone: true })
+                        return saved.filter((profile): profile is PartialProfile<SSHProfile> => profile.type === 'ssh' && !profile.isBuiltin)
+                            .map(profile => profiles.getConfigProxyForProfile(profile))
+                    }).then(() => cloud.start())
+                } else {
+                    cloud.start()
+                }
+            })
+        }
+        if (bootstrap.accountId || bootstrap.localWorkspace) {
             app.ready$.subscribe(() => connections.open())
         }
     }

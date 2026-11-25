@@ -1,4 +1,4 @@
-import { app, ipcMain, Menu, Tray, shell, screen, globalShortcut, MenuItemConstructorOptions, WebContents } from 'electron'
+import { app, ipcMain, Menu, Tray, nativeImage, shell, screen, globalShortcut, MenuItemConstructorOptions, WebContents } from 'electron'
 import promiseIpc from 'electron-promise-ipc'
 import * as remote from '@electron/remote/main'
 import { spawnSync } from 'child_process'
@@ -46,9 +46,11 @@ export class Application {
     private quitRequested = false
     private configStore: any
     readonly configPath: string
+    readonly sessionPartition: string
     userPluginsPath: string
 
-    constructor (public readonly accountId: string, accountDirectory: string) {
+    constructor (public readonly accountId: string | null, accountDirectory: string, public readonly accountEmail?: string) {
+        this.sessionPartition = accountId ? `persist:tabby-account-${accountId}` : 'persist:topper-local-workspace'
         this.configPath = path.join(accountDirectory, 'config.yaml')
         this.configStore = loadConfig(this.configPath)
         remote.initialize()
@@ -204,12 +206,8 @@ export class Application {
             return
         }
 
-        if (process.platform === 'darwin') {
-            this.tray = new Tray(`${app.getAppPath()}/assets/tray-darwinTemplate.png`)
-            this.tray.setPressedImage(`${app.getAppPath()}/assets/tray-darwinHighlightTemplate.png`)
-        } else {
-            this.tray = new Tray(`${app.getAppPath()}/assets/tray.png`)
-        }
+        const icon = nativeImage.createFromPath(path.join(app.getAppPath(), 'assets', 'topper-terminal.png'))
+        this.tray = new Tray(icon.resize({ width: process.platform === 'darwin' ? 18 : 24 }))
 
         this.tray.on('click', () => setTimeout(() => this.focus()))
 
@@ -377,7 +375,7 @@ export class Application {
                     {
                         label: 'Website',
                         click () {
-                            shell.openExternal('https://topperapi.com')
+                            shell.openExternal('https://www.topperapi.com/TopperTerminal/')
                         },
                     },
                 ],

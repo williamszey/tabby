@@ -6,7 +6,7 @@ import { SudoPromptMatcher } from './promptMatcher'
 
 export class AutoSudoPasswordMiddleware extends SessionMiddleware {
     private pendingPasswordToPaste: string | null = null
-    private pasteHint = `${colors.black.bgBlackBright(' Tabby ')} ${colors.gray('Press Enter to paste saved password')}`
+    private pasteHint = `${colors.black.bgBlackBright(' TopperTerminal ')} ${colors.gray('Press Enter to paste saved password')}`
     private pasteHintLength = colors.stripColor(this.pasteHint).length
     private promptMatcher = new SudoPromptMatcher()
     private promptGeneration = 0

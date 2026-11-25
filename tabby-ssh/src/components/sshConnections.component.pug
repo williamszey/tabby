@@ -3,49 +3,102 @@
         .connections-heading
             h2 SSH 连接
             button.btn.btn-primary.btn-sm(type='button', [disabled]='saving', (click)='add()') ＋ SSH
-        p.text-muted.empty(*ngIf='!connections.length') 尚未保存 SSH 连接。
-        button.connection-row(
-            *ngFor='let profile of connections',
-            type='button',
-            [class.selected]='selected?.id === profile.id',
-            [attr.aria-pressed]='selected?.id === profile.id',
-            [disabled]='saving',
-            (click)='select(profile)',
-            (dblclick)='connect(profile)',
-            (keydown.enter)='connect(profile); $event.preventDefault()',
-        )
-            i.fas.fa-server(aria-hidden='true')
-            span
-                strong {{profile.name}}
-                small {{address(profile)}}
-        button.btn.btn-link.sign-out(type='button', [disabled]='saving', (click)='signOut()') 退出登录
+        .connection-items
+            p.text-muted.empty(*ngIf='!connections.length') 尚未保存 SSH 连接。
+            button.connection-row(
+                *ngFor='let profile of connections',
+                type='button',
+                [class.selected]='selected?.id === profile.id',
+                [attr.aria-pressed]='selected?.id === profile.id',
+                [disabled]='saving',
+                (click)='select(profile)',
+                (dblclick)='connect(profile)',
+                (keydown.enter)='connect(profile); $event.preventDefault()',
+            )
+                .connection-icon(aria-hidden='true')
+                    i.fas.fa-server
+                .connection-details
+                    strong {{profile.name}}
+                    small([attr.title]='address(profile)') {{address(profile)}}
+        .connections-footer
+            ng-container(*ngIf='signedIn; else localAccess')
+                p.account-email([attr.title]='accountEmail') {{accountEmail || '重新登录后显示邮箱'}}
+                p.password-status(*ngIf='passwordStorage.migrationStatus', role='status') {{passwordStorage.migrationStatus}}
+                .cloud-sync
+                    strong 云同步
+                    p([ngSwitch]='cloud.status', aria-live='polite')
+                        span(*ngSwitchCase='"active"') {{cloud.plan === 'paid' ? '套餐有效至' : '试用至'}} {{cloud.expiresAt | date:'yyyy/MM/dd HH:mm'}}
+                        span(*ngSwitchCase='"expired"') 云同步已到期 · 仅本地保存
+                        span(*ngSwitchCase='"local"') 仅本地保存
+                        span(*ngSwitchCase='"reauth"')
+                            ng-container(*ngIf='cloud.plan === "paid"') 套餐有效至 {{cloud.expiresAt | date:'yyyy/MM/dd HH:mm'}} ·
+                            | 重新登录以启用同步
+                        span(*ngSwitchCase='"unavailable"') 同步暂不可用 · 仅本地保存
+                        span(*ngSwitchCase='"limit"') 超过同步容量 · 仅本地保存
+                        span(*ngSwitchDefault) 正在检查试用状态…
+                    button.btn.btn-outline-primary.btn-sm(*ngIf='cloud.status === "reauth"', type='button', [disabled]='saving || openingLogin', (click)='signIn()') 重新登录
+                    button.btn.btn-outline-primary.btn-sm(*ngIf='cloud.status !== "active" || cloud.plan !== "paid"', type='button', (click)='openShop()') 购买套餐
+                button.btn.sign-out(type='button', [disabled]='saving', (click)='signOut()')
+                    i.fas.fa-sign-out-alt(aria-hidden='true')
+                    | 退出登录
+            ng-template(#localAccess)
+                .cloud-sync
+                    strong 本机模式
+                    p SSH 连接保存在此设备。
+                    button.btn.btn-outline-primary.btn-sm(type='button', [disabled]='saving || openingLogin', (click)='signIn()')
+                        i.fas.fa-sign-in-alt.me-1(aria-hidden='true')
+                        | 登录 / 注册
 
     section.connection-editor(aria-label='SSH 连接编辑')
-        ng-container(*ngIf='fields as edit; else selectHelp')
-            .editor-heading
-                h2 {{selected ? '编辑 SSH 连接' : '添加 SSH 连接'}}
-                button.btn.btn-outline-secondary.btn-sm(*ngIf='selected', type='button', [disabled]='saving', (click)='connect(selected)') 连接
-            form((ngSubmit)='save()')
-                fieldset([disabled]='saving')
-                    label(for='ssh-name') 连接名称
-                    input.form-control(id='ssh-name', name='name', [(ngModel)]='edit.name', placeholder='例如 生产服务器')
+        .editor-content
+            form.editor-card(*ngIf='fields as edit; else selectHelp', (ngSubmit)='save()')
+                .editor-heading
+                    h2 {{selected ? '编辑 SSH 连接' : '添加 SSH 连接'}}
+                    button.btn.btn-outline-secondary.btn-sm(*ngIf='selected', type='button', [disabled]='saving', (click)='connect(selected)') 连接
+                fieldset.editor-fields([disabled]='saving')
+                    div
+                        label(for='ssh-name') 连接名称
+                        input.form-control(id='ssh-name', name='name', [(ngModel)]='edit.name', placeholder='例如 生产服务器')
                     .address-fields
                         div
                             label(for='ssh-address') IP 或主机名
-                            input.form-control(id='ssh-address', name='host', [(ngModel)]='edit.host', placeholder='192.0.2.10')
+                            input.form-control(id='ssh-address', name='host', [(ngModel)]='edit.host', (ngModelChange)='hidePassword()', placeholder='192.0.2.10')
                         div
                             label(for='ssh-port') 端口
-                            input.form-control(id='ssh-port', name='port', type='number', min='1', max='65535', [(ngModel)]='edit.port')
-                    label(for='ssh-user') SSH 用户名
-                    input.form-control(id='ssh-user', name='username', [(ngModel)]='edit.user', autocomplete='off')
-                    label(for='ssh-password') SSH 密码
-                    input.form-control(id='ssh-password', name='password', type='password', [(ngModel)]='edit.password', autocomplete='new-password', [placeholder]='selected ? "留空保留当前凭据" : "可选"')
-                    .editor-actions
-                        button.btn.btn-primary(type='submit') {{saving ? '正在保存…' : '确定'}}
-        ng-template(#selectHelp)
-            .editor-placeholder
-                i.fas.fa-terminal(aria-hidden='true')
-                h2 {{connections.length ? '选择 SSH 连接' : '添加你的第一个连接'}}
-                p.text-muted {{connections.length ? '单击编辑，双击连接。' : '点击「＋ SSH」填写服务器地址和登录信息。'}}
-        p.editor-status.text-danger(*ngIf='error', role='alert') {{error}}
-        p.editor-status.text-success(*ngIf='message', role='status') {{message}}
+                            input.form-control(id='ssh-port', name='port', type='number', min='1', max='65535', [(ngModel)]='edit.port', (ngModelChange)='hidePassword()')
+                    div
+                        label(for='ssh-user') SSH 用户名
+                        input.form-control(id='ssh-user', name='username', [(ngModel)]='edit.user', (ngModelChange)='hidePassword()', autocomplete='off')
+                    div
+                        label(for='ssh-password') SSH 密码
+                        .password-field
+                            input.form-control(
+                                id='ssh-password',
+                                name='password',
+                                [type]='passwordVisible ? "text" : "password"',
+                                [ngModel]='passwordPreview ?? edit.password',
+                                (ngModelChange)='edit.password = $event; clearPasswordPreview()',
+                                autocomplete='new-password',
+                                [placeholder]='selected ? "留空保留当前凭据" : "可选"',
+                            )
+                            button.password-toggle(
+                                type='button',
+                                aria-label='显示密码',
+                                aria-controls='ssh-password',
+                                [attr.aria-pressed]='passwordVisible',
+                                [attr.title]='passwordVisible ? "隐藏密码" : "显示密码"',
+                                (click)='togglePassword()',
+                            )
+                                i.fas([class.fa-eye]='!passwordVisible', [class.fa-eye-slash]='passwordVisible', aria-hidden='true')
+                        p.password-status(*ngIf='passwordStatus', role='status') {{passwordStatus}}
+                .editor-actions
+                    p.editor-status.text-danger(*ngIf='error', role='alert') {{error}}
+                    p.editor-status.text-success(*ngIf='message', role='status') {{message}}
+                    button.btn.btn-primary(type='submit', [disabled]='saving') {{saving ? '正在保存…' : '确定'}}
+            ng-template(#selectHelp)
+                .editor-placeholder
+                    .placeholder-icon(aria-hidden='true')
+                        i.fas.fa-terminal
+                    h2 {{connections.length ? '选择 SSH 连接' : '添加你的第一个连接'}}
+                    p {{connections.length ? '单击编辑，双击连接。' : '点击「＋ SSH」填写服务器地址和登录信息。'}}
+                    p.text-danger(*ngIf='error', role='alert') {{error}}

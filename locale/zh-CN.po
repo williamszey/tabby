@@ -992,8 +992,8 @@ msgid "Hacks"
 msgstr "调整"
 
 #: locale/tmp-html/tabby-core/src/components/welcomeTab.component.html:33
-msgid "Help track the number of Tabby installs across the world!"
-msgstr "帮助追踪 Tabby 在世界各地的安装次数！"
+msgid "Help track the number of installations."
+msgstr "统计应用安装次数。"
 
 #: locale/tmp-html/tabby-settings/src/components/settingsTab.component.html:50
 msgid "Help translate Tabby"
@@ -1017,8 +1017,8 @@ msgid "Hide tab index"
 msgstr "隐藏标签页索引"
 
 #: locale/tmp-html/tabby-settings/src/components/windowSettingsTab.component.html:127
-msgid "Hide Tabby from tray or menu bar."
-msgstr "从托盘或菜单栏中隐藏 Tabby。"
+msgid "Hide the app from the tray or menu bar."
+msgstr "在托盘或菜单栏隐藏应用。"
 
 #: locale/tmp-html/tabby-settings/src/components/windowSettingsTab.component.html:170
 msgid "Hide tab options button"
@@ -1059,8 +1059,8 @@ msgid "Hotkeys"
 msgstr "快捷键"
 
 #: locale/tmp-html/tabby-settings/src/components/profilesSettingsTab.component.html:83
-msgid "How Tabby presents itself through environment vars"
-msgstr "Tabby 如何通过环境变量标识自身"
+msgid "Environment variables sent to the shell"
+msgstr "发送到 Shell 的环境变量"
 
 #: locale/tmp-html/tabby-ssh/src/components/sshProfileSettings.component.html:24
 msgid "HTTP proxy"
@@ -1121,8 +1121,8 @@ msgid "Installed"
 msgstr "已安装"
 
 #: tabby-electron/src/services/updater.service.ts:131
-msgid "Installing the update will close all tabs and restart Tabby."
-msgstr "安装更新将关闭全部标签页并重启 Tabby。"
+msgid "Installing the update will close all tabs and restart TopperTerminal."
+msgstr "安装更新将关闭所有标签页并重启 TopperTerminal。"
 
 #: tabby-terminal/src/hotkeys.ts:66
 msgid "Intelligent Ctrl-C (copy/abort)"
@@ -1666,8 +1666,8 @@ msgid "Purple"
 msgstr "紫色"
 
 #: locale/tmp-html/tabby-settings/src/components/vaultSettingsTab.component.html:38
-msgid "Puts all of Tabby's configuration into the vault"
-msgstr "将 Tabby 的所有配置放入保险库"
+msgid "Puts all application settings into the vault"
+msgstr "将所有应用设置存入保险库"
 
 #: tabby-core/src/index.ts:219
 #: tabby-core/src/services/profiles.service.ts:295
@@ -1959,8 +1959,8 @@ msgid "Set password"
 msgstr "设置密码"
 
 #: locale/tmp-html/tabby-terminal/src/components/terminalSettingsTab.component.html:168
-msgid "Set Tabby as %COMSPEC%"
-msgstr "将 Tabby 设置为 %COMSPEC%"
+msgid "Set TopperTerminal as %COMSPEC%"
+msgstr "将 TopperTerminal 设置为 %COMSPEC%"
 
 #: locale/tmp-html/tabby-settings/src/components/profilesSettingsTab.component.html:69
 msgid "Set to 0 to disable recent profiles"
@@ -2234,8 +2234,8 @@ msgid "Tab activity"
 msgstr "标签页活动"
 
 #: locale/tmp-html/tabby-core/src/components/safeModeModal.component.html:3
-msgid "Tabby could not start with your plugins, so all third party plugins have been disabled in this session. The error was:"
-msgstr "Tabby 无法在加载插件后启动，因此本次会话已禁用所有第三方插件。错误信息："
+msgid "TopperTerminal could not start with your plugins, so all third party plugins have been disabled in this session. The error was:"
+msgstr "TopperTerminal 无法在加载插件后启动，本次会话已禁用所有第三方插件。错误信息："
 
 #: locale/tmp-html/tabby-settings/src/components/settingsTab.component.html:41
 msgid "Tabby news and updates on Twitter"
@@ -2275,8 +2275,8 @@ msgid "Terminal identification"
 msgstr "终端标识"
 
 #: locale/tmp-html/tabby-core/src/components/welcomeTab.component.html:7
-msgid "Thank you for downloading Tabby!"
-msgstr "感谢您下载 Tabby！"
+msgid "Thank you for downloading TopperTerminal!"
+msgstr "感谢下载 TopperTerminal！"
 
 #: locale/tmp-html/tabby-settings/src/components/windowSettingsTab.component.html:5
 msgid "Theme"
@@ -2469,8 +2469,8 @@ msgid "Warning: remote host's key has suddenly changed!"
 msgstr "警告：远程主机密钥突然改变！"
 
 #: locale/tmp-html/tabby-settings/src/components/settingsTab.component.html:67
-msgid "We're only tracking your Tabby and OS versions."
-msgstr "我们只获取您的 Tabby 和操作系统版本信息。"
+msgid "Includes the application and operating system versions."
+msgstr "包含应用版本和操作系统版本。"
 
 #: tabby-core/src/components/welcomeTab.component.ts:25
 msgid "Welcome"
@@ -2579,3 +2579,9 @@ msgstr "缩小"
 msgctxt "[Dynamic] port forwarding"
 msgid "id.port-forwarding.dynamic"
 msgstr "动态端口转发"
+
+msgid "Product website"
+msgstr "产品网站"
+
+msgid "Remember for {time} while the app is open"
+msgstr "在应用运行期间记住 {time}"

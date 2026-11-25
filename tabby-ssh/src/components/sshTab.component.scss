@@ -5,3 +5,184 @@ sftp-panel {
     bottom: 0;
     z-index: 5;
 }
+
+:host {
+    --command-history-width: clamp(148px, 23%, 288px);
+    --command-history-top: 0px;
+    --command-history-handle-width: 30px;
+    --history-bg: var(--theme-bg, var(--bs-body-bg));
+    --history-fg: var(--theme-fg, var(--bs-body-color));
+    --history-muted: color-mix(in srgb, var(--history-fg) 82%, var(--history-bg));
+    --history-surface: color-mix(in srgb, var(--history-fg) 8%, var(--history-bg));
+    --history-border: color-mix(in srgb, var(--history-fg) 25%, var(--history-bg));
+    --history-accent: color-mix(in srgb, var(--bs-primary) 65%, var(--history-fg));
+    --history-accent-bg: color-mix(in srgb, var(--history-accent) 16%, var(--history-bg));
+
+    &.toolbar-pinned {
+        --command-history-top: 40px;
+    }
+
+    &.command-history-collapsed > .content {
+        margin-right: var(--command-history-handle-width);
+    }
+
+    &.command-history-visible > .content {
+        margin-right: var(--command-history-width);
+    }
+}
+
+:host-context(.with-title-inset) {
+    --command-history-top: 20px;
+
+    &.toolbar-pinned {
+        --command-history-top: 60px;
+    }
+}
+
+.command-history {
+    position: absolute;
+    inset: var(--command-history-top) 0 0 auto;
+    width: var(--command-history-width);
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+    background: var(--history-bg);
+    border-left: 1px solid var(--history-border);
+    color: var(--history-fg);
+}
+
+.command-history-header {
+    display: flex;
+    align-items: center;
+    padding: 7px 48px 7px 8px;
+    border-bottom: 1px solid var(--history-border);
+}
+
+.command-history-tabs {
+    display: flex;
+    gap: 3px;
+    padding: 3px;
+    background: var(--history-surface);
+    border-radius: 7px;
+}
+
+.command-history-tab, .command-history-toggle {
+    display: grid;
+    place-items: center;
+    width: 34px;
+    height: 29px;
+    background: transparent;
+    border: 0;
+    border-radius: 5px;
+    color: var(--history-muted);
+
+    &:hover {
+        background: var(--history-surface);
+        color: var(--history-fg);
+    }
+
+    &[aria-selected='true'] {
+        background: var(--history-accent-bg);
+        color: var(--history-accent);
+    }
+}
+
+.command-history-toggle {
+    position: absolute;
+    top: calc(var(--command-history-top) + 10px);
+    right: 8px;
+    z-index: 3;
+
+    &[aria-expanded='false'] {
+        top: max(48px, calc(var(--command-history-top) + 10px));
+        right: 0;
+        width: var(--command-history-handle-width);
+        height: 36px;
+        border: 1px solid var(--history-border);
+        border-radius: 7px 0 0 7px;
+        background: var(--history-accent-bg);
+        color: var(--history-accent);
+
+        &:hover {
+            border-color: var(--history-accent);
+            color: var(--history-fg);
+        }
+    }
+}
+
+.command-history button:focus-visible, .command-history-toggle:focus-visible {
+    outline: 2px solid var(--history-accent);
+    outline-offset: -1px;
+}
+
+.command-history-content {
+    overflow: auto;
+    padding: 10px 8px 16px;
+}
+
+.command-history-empty, .command-history-help {
+    color: var(--history-muted);
+    margin: 4px 5px 12px;
+}
+
+.command-history-enable {
+    --bs-btn-color: var(--history-fg);
+    --bs-btn-bg: var(--history-accent-bg);
+    --bs-btn-border-color: var(--history-accent);
+    --bs-btn-hover-color: var(--history-fg);
+    --bs-btn-hover-bg: var(--history-surface);
+    --bs-btn-hover-border-color: var(--history-accent);
+    --bs-btn-active-color: var(--history-fg);
+    --bs-btn-active-bg: var(--history-accent-bg);
+    --bs-btn-active-border-color: var(--history-accent);
+    --bs-btn-disabled-color: var(--history-muted);
+    --bs-btn-disabled-border-color: var(--history-border);
+}
+
+.command-history-help small {
+    display: block;
+    margin-top: 6px;
+    overflow-wrap: anywhere;
+}
+
+.command-history-row {
+    display: flex;
+    align-items: center;
+    min-height: 34px;
+    border-radius: 6px;
+
+    &:hover, &:focus-within {
+        background: var(--history-surface);
+    }
+}
+
+.command-text, .command-star {
+    background: transparent;
+    border: 0;
+    color: inherit;
+    padding: 7px;
+    border-radius: 5px;
+
+    &:disabled {
+        opacity: .65;
+    }
+}
+
+.command-text {
+    flex: 1;
+    min-width: 0;
+    text-align: left;
+    font-family: var(--bs-font-monospace);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    unicode-bidi: plaintext;
+}
+
+.command-star {
+    min-width: 32px;
+}
+
+.command-star.starred {
+    color: color-mix(in srgb, var(--bs-warning) 62%, var(--history-fg));
+}

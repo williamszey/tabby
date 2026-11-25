@@ -17,6 +17,13 @@
 
 $tab-border-radius: 4px;
 
+.mac-window-drag-strip {
+    flex: 0 0 max(32px, calc(32px * var(--spaciness)));
+    background: var(--theme-bg-more-2);
+    border-bottom: 1px solid color-mix(in srgb, var(--theme-fg) 10%, transparent);
+    -webkit-app-region: drag;
+}
+
 .wrap {
   display: flex;
   width: 100vw;

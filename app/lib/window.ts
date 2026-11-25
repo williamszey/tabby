@@ -67,7 +67,7 @@ export class Window {
                 preload: path.join(__dirname, 'sentry.js'),
                 backgroundThrottling: false,
                 contextIsolation: false,
-                partition: `persist:tabby-account-${this.application.accountId}`,
+                partition: this.application.sessionPartition,
             },
             maximizable: true,
             frame: false,
@@ -420,7 +420,9 @@ export class Window {
                 isMainWindow: this.isMainWindow,
                 userPluginsPath: this.application.userPluginsPath,
                 configPath: this.application.configPath,
-                accountId: this.application.accountId,
+                localWorkspace: this.application.accountId === null,
+                accountId: this.application.accountId ?? undefined,
+                accountEmail: this.application.accountEmail,
             })
         })
 

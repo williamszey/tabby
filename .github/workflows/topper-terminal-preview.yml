@@ -3,7 +3,7 @@ name: Topper Terminal Windows installer
 on:
   workflow_dispatch:
   push:
-    branches: [topper-terminal-preview]
+    branches: ['topper-terminal-preview', 'topper-terminal-preview-*']
 
 permissions:
   contents: read
@@ -13,6 +13,7 @@ jobs:
     runs-on: windows-2022
     env:
       ARCH: x64
+      TOPPER_TERMINAL_VERSION: 1.0.0-beta.15
     steps:
       - uses: actions/checkout@v4
         with:

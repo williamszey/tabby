@@ -5,20 +5,27 @@ import { AuthClient, LoginResult } from './authClient'
 
 const channel = 'tabby-account:authenticate'
 
+interface SignedInAccount {
+    accountId: string
+    importLocal: boolean
+}
+
 export class AccountLogin {
-    readonly result: Promise<string | null>
+    readonly result: Promise<SignedInAccount | null>
     private window: BrowserWindow
 
-    constructor (auth: AuthClient) {
+    constructor (auth: AuthClient, parent: BrowserWindow, canImportLocal: boolean) {
         const assets = path.join(app.getAppPath(), 'assets', 'account-login')
         this.window = new BrowserWindow({
-            title: 'Topper Terminal 登录',
-            width: 460,
-            height: 515,
+            title: 'TopperTerminal 登录',
+            width: 480,
+            height: canImportLocal ? 616 : 554,
+            parent,
+            modal: true,
             useContentSize: true,
             resizable: false,
             show: false,
-            backgroundColor: '#111820',
+            backgroundColor: '#101317',
             webPreferences: {
                 preload: path.join(assets, 'preload.cjs'),
                 partition: 'tabby-local-login',
@@ -38,7 +45,7 @@ export class AccountLogin {
         this.result = new Promise((resolve, reject) => {
             let submitting = false
             let authenticated = false
-            ipcMain.handle(channel, async (event, mode: unknown, email: unknown, password: unknown, confirmation: unknown): Promise<LoginResult> => {
+            ipcMain.handle(channel, async (event, mode: unknown, email: unknown, password: unknown, confirmation: unknown, importLocal: unknown): Promise<LoginResult> => {
                 if (window.isDestroyed() || event.sender !== window.webContents ||
                     event.senderFrame?.parent !== null || submitting || authenticated) {
                     return 'unavailable'
@@ -52,7 +59,7 @@ export class AccountLogin {
                     const result = await auth.authenticate(mode, email, password)
                     if (result.status === 'ok' && !window.isDestroyed()) {
                         authenticated = true
-                        resolve(result.accountId)
+                        resolve({ accountId: result.accountId, importLocal: canImportLocal && importLocal === true })
                     }
                     return result.status
                 } catch (error) {
@@ -63,6 +70,11 @@ export class AccountLogin {
                 }
             })
 
+            window.on('close', event => {
+                if (submitting) {
+                    event.preventDefault()
+                }
+            })
             window.once('closed', () => {
                 ipcMain.removeHandler(channel)
                 resolve(null)
@@ -70,7 +82,7 @@ export class AccountLogin {
             window.webContents.once('render-process-gone', () => {
                 reject(new Error('The account login window closed unexpectedly'))
             })
-            window.loadFile(path.join(assets, 'index.html')).catch(error => {
+            window.loadFile(path.join(assets, 'index.html'), { query: { importLocal: canImportLocal ? '1' : '0' } }).catch(error => {
                 if (!window.isDestroyed()) {
                     reject(error)
                 }

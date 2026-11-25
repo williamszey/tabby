@@ -21,7 +21,7 @@ export class SSHConnectionsCommand extends CommandProvider {
     }
 
     async provide (): Promise<Command[]> {
-        return this.bootstrap.accountId ? [{
+        return this.bootstrap.accountId || this.bootstrap.localWorkspace ? [{
             id: 'ssh:connections',
             label: 'SSH 连接',
             locations: [CommandLocation.LeftToolbar, CommandLocation.StartPage],

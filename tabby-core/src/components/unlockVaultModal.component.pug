@@ -5,7 +5,7 @@
             button.btn.btn-link(ngbDropdownToggle, (click)='$event.stopPropagation()')
                 span(
                     *ngIf='rememberFor',
-                    translate='Remember for {time} while Tabby is open',
+                    translate='Remember for {time} while the app is open',
                     [translateParams]='{time: getRememberForDisplay(rememberFor)}'
                 )
                 span(*ngIf='!rememberFor', translate) Do not remember
@@ -20,7 +20,7 @@
                 ) {{getRememberForDisplay(x)}}
 
     .text-muted.small.mb-3(translate)
-        | The master passphrase is kept in memory only. Closing Tabby requires unlocking the vault again.
+        | The master passphrase is kept in memory only. Closing the app requires unlocking the vault again.
 
     .input-group
         input.form-control.form-control-lg(

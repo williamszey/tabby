@@ -22,5 +22,7 @@ export interface BootstrapData {
     installedPlugins: PluginInfo[]
     userPluginsPath: string
     configPath?: string
+    localWorkspace?: boolean
     accountId?: string
+    accountEmail?: string
 }

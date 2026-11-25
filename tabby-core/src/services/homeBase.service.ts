@@ -23,6 +23,10 @@ export class HomeBaseService {
         }
     }
 
+    openProductWebsite (): void {
+        this.platform.openExternal('https://www.topperapi.com/TopperTerminal/')
+    }
+
     openGitHub (): void {
         this.platform.openExternal('https://github.com/williamszey/tabby')
     }

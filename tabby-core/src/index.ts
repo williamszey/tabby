@@ -167,7 +167,7 @@ export default class AppModule { // eslint-disable-line @typescript-eslint/no-ex
     ) {
         app.ready$.subscribe(() => {
             config.ready$.toPromise().then(() => {
-                if (!bootstrap.accountId && config.store.enableWelcomeTab) {
+                if (!bootstrap.accountId && !bootstrap.localWorkspace && config.store.enableWelcomeTab) {
                     app.openNewTabRaw({ type: WelcomeTabComponent })
                 }
             })

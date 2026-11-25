@@ -1,8 +1,6 @@
-import { Component, Input, Output, EventEmitter, ViewChild, ElementRef, ChangeDetectionStrategy, OnInit, ChangeDetectorRef } from '@angular/core'
+import { Component, Input, Output, EventEmitter, ViewChild, ElementRef, ChangeDetectionStrategy } from '@angular/core'
 import { PlatformService } from 'tabby-core'
 import { KeyboardInteractivePrompt } from '../session/ssh'
-import { SSHProfile } from '../api'
-import { PasswordStorageService } from '../services/passwordStorage.service'
 
 const PROMPT_URL_REGEX = /https?:\/\/[^\s<>"']+/g
 const TRAILING_PROMPT_URL_PUNCTUATION = /[),.;:!?]+$/
@@ -18,35 +16,13 @@ interface PromptPart {
     styleUrls: ['./keyboardInteractiveAuthPanel.component.scss'],
     changeDetection: ChangeDetectionStrategy.OnPush,
 })
-export class KeyboardInteractiveAuthComponent implements OnInit {
-    @Input() profile: SSHProfile
+export class KeyboardInteractiveAuthComponent {
     @Input() prompt: KeyboardInteractivePrompt
     @Input() step = 0
     @Output() done = new EventEmitter()
     @ViewChild('input') input: ElementRef
-    remember = false
 
-    constructor (
-        private passwordStorage: PasswordStorageService,
-        private platform: PlatformService,
-        private cdr: ChangeDetectorRef,
-    ) {}
-
-    async ngOnInit (): Promise<void> {
-        const savedPassword = await this.passwordStorage.loadPassword(this.profile)
-        if (savedPassword != null) {
-            for (let i = 0; i < this.prompt.prompts.length; i++) {
-                if (this.prompt.isAPasswordPrompt(i) && !this.prompt.responses[i]) {
-                    this.prompt.responses[i] = savedPassword
-                }
-            }
-            this.cdr.markForCheck()
-        }
-    }
-
-    isPassword (): boolean {
-        return this.prompt.isAPasswordPrompt(this.step)
-    }
+    constructor (private platform: PlatformService) {}
 
     shouldEcho (): boolean {
         return this.prompt.prompts[this.step].echo ?? false
@@ -106,10 +82,6 @@ export class KeyboardInteractiveAuthComponent implements OnInit {
     }
 
     next (): void {
-        if (this.isPassword() && this.remember) {
-            this.passwordStorage.savePassword(this.profile, this.prompt.responses[this.step])
-        }
-
         if (this.step === this.prompt.prompts.length - 1) {
             this.prompt.respond()
             this.done.emit()

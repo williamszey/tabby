@@ -1,29 +1,324 @@
-:host { display: block; height: 100%; min-height: 0; }
-.connections-workspace { display: grid; grid-template-columns: minmax(180px, 30%) 1fr; height: 100%; }
-.connection-list { display: flex; flex-direction: column; min-width: 0; overflow: auto; border-right: 1px solid var(--bs-border-color); padding: 1rem; }
-.connections-heading, .editor-heading { display: flex; align-items: center; justify-content: space-between; gap: .75rem; margin-bottom: 1rem; }
-h2 { margin: 0; font-size: 1.12rem; }
-.connections-heading .btn { white-space: nowrap; flex: none; }
-.connection-row { display: flex; align-items: center; gap: .7rem; padding: .7rem; margin: 0 0 .25rem; border: 1px solid transparent; border-radius: .45rem; color: inherit; background: transparent; text-align: left; width: 100%; }
-.connection-row:hover, .connection-row.selected { background: var(--bs-secondary-bg, #263341); border-color: var(--bs-border-color); }
-.connection-row span { min-width: 0; }
-.connection-row strong, .connection-row small { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.connection-row small { opacity: .76; font-family: monospace; }
-.empty { padding-top: .5rem; }
-.sign-out { align-self: start; margin-top: auto; padding-inline: .25rem; }
-.connection-editor { min-width: 0; overflow: auto; padding: 1.5rem clamp(1rem, 4vw, 3rem); }
-form, .editor-heading { max-width: 37rem; }
-fieldset { min-width: 0; }
-label { display: block; margin: .65rem 0 .3rem; }
-.address-fields { display: grid; grid-template-columns: minmax(0, 1fr) minmax(5rem, 7rem); gap: .75rem; }
-.editor-actions { display: flex; justify-content: end; padding-top: 1.15rem; }
-.editor-actions button { min-width: 5.5rem; }
-.editor-placeholder { display: grid; justify-items: center; align-content: center; height: 95%; text-align: center; gap: .65rem; }
-.editor-placeholder i { font-size: 1.65rem; opacity: .74; }
-.editor-status { margin: .7rem 0 0; }
-@media (max-width: 530px) {
-    .connections-workspace { grid-template-columns: minmax(130px, 35%) 1fr; }
-    .connection-list { padding: .65rem; }
-    .connections-heading { align-items: flex-start; flex-direction: column; }
-    .connection-editor { padding: 1rem .8rem; }
+:host {
+    display: block;
+    width: 100%;
+    height: 100%;
+    min-height: 0;
+    min-width: 0;
+    container-type: inline-size;
+}
+
+.connections-workspace {
+    --ssh-text: var(--theme-fg, var(--bs-body-color));
+    --ssh-border: color-mix(in srgb, var(--ssh-text) 16%, transparent);
+    --ssh-muted: color-mix(in srgb, var(--ssh-text) 70%, var(--body-bg));
+    --ssh-accent: var(--theme-primary, var(--bs-primary));
+    --ssh-accent-bg: color-mix(in srgb, var(--ssh-accent) 13%, transparent);
+
+    display: grid;
+    grid-template-columns: clamp(10rem, 30%, 18rem) minmax(0, 1fr);
+    height: 100%;
+}
+
+.connection-list {
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+    min-width: 0;
+    padding: 1.1rem .8rem .6rem;
+    border-inline-end: 1px solid var(--ssh-border);
+}
+
+.connections-heading, .editor-heading {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: .65rem;
+}
+
+.connections-heading {
+    padding-inline: .3rem;
+    margin-bottom: .9rem;
+}
+
+h2 {
+    margin: 0;
+    font-size: 1.05rem;
+    font-weight: 650;
+}
+
+.connections-heading .btn, .editor-heading .btn {
+    flex: none;
+    white-space: nowrap;
+}
+
+.connection-items {
+    flex: 1;
+    min-height: 0;
+    overflow: auto;
+    padding: .15rem;
+}
+
+.connection-row {
+    display: flex;
+    align-items: center;
+    gap: .65rem;
+    width: 100%;
+    margin-bottom: .25rem;
+    padding: .55rem;
+    border: 1px solid transparent;
+    border-radius: .6rem;
+    background: transparent;
+    color: inherit;
+    text-align: start;
+}
+
+.connection-row:hover {
+    background: color-mix(in srgb, var(--ssh-text) 6%, transparent);
+}
+
+.connection-row.selected {
+    border-color: color-mix(in srgb, var(--ssh-accent) 45%, transparent);
+    background: var(--ssh-accent-bg);
+}
+
+.connection-row:focus-visible, .password-toggle:focus-visible {
+    outline: 2px solid var(--ssh-accent);
+    outline-offset: -2px;
+}
+
+.connection-icon, .placeholder-icon {
+    display: grid;
+    flex: none;
+    place-items: center;
+    width: 2rem;
+    height: 2rem;
+    border-radius: .5rem;
+    background: color-mix(in srgb, var(--ssh-text) 9%, transparent);
+}
+
+.selected .connection-icon, .placeholder-icon {
+    background: var(--ssh-accent-bg);
+    color: var(--ssh-accent);
+}
+
+.connection-details {
+    min-width: 0;
+}
+
+.connection-details strong, .connection-details small {
+    display: block;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.connection-details small {
+    margin-top: .15rem;
+    color: var(--ssh-muted);
+    font-family: var(--bs-font-monospace, monospace);
+}
+
+.empty {
+    margin: .4rem;
+}
+
+.connections-footer {
+    padding-top: .45rem;
+    border-top: 1px solid var(--ssh-border);
+}
+
+.account-email {
+    margin: .2rem .45rem .35rem;
+    overflow: hidden;
+    color: var(--ssh-muted);
+    font-size: .85rem;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.cloud-sync {
+    padding: .45rem .45rem .6rem;
+}
+
+.cloud-sync p {
+    margin: .2rem 0 .45rem;
+    color: var(--ssh-muted);
+    font-size: .85rem;
+}
+
+.sign-out {
+    display: inline-flex;
+    align-items: center;
+    gap: .5rem;
+    color: var(--ssh-muted);
+}
+
+.connection-editor {
+    min-width: 0;
+    overflow: auto;
+    padding: clamp(1rem, 3cqi, 2.5rem);
+    background: color-mix(in srgb, var(--theme-bg-more-2) 45%, var(--body-bg));
+}
+
+.editor-content {
+    width: min(100%, 38rem);
+    min-height: 100%;
+    margin-inline: auto;
+}
+
+.editor-card {
+    overflow: hidden;
+    border: 1px solid var(--ssh-border);
+    border-radius: .8rem;
+    background: var(--body-bg, var(--bs-secondary-bg, var(--bs-body-bg)));
+}
+
+.editor-heading, .editor-fields, .editor-actions {
+    padding: .95rem clamp(.85rem, 2.6cqi, 1.6rem);
+}
+
+.editor-heading {
+    min-height: 3.75rem;
+    border-bottom: 1px solid var(--ssh-border);
+}
+
+.editor-fields {
+    display: grid;
+    gap: .85rem;
+    min-width: 0;
+    padding-block: 1rem 1.15rem;
+}
+
+label {
+    display: block;
+    margin-bottom: .35rem;
+    font-weight: 550;
+}
+
+.editor-fields .form-control {
+    min-height: 2.45rem;
+    border: 1px solid var(--ssh-border);
+    border-radius: .5rem;
+}
+
+.editor-fields .form-control:focus {
+    border-color: var(--ssh-accent);
+}
+
+.address-fields {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 6rem;
+    gap: .75rem;
+}
+
+.password-field {
+    position: relative;
+}
+
+.password-field .form-control {
+    padding-inline-end: 3.2rem;
+}
+
+.password-toggle {
+    position: absolute;
+    inset-block: .2rem;
+    inset-inline-end: .2rem;
+    display: grid;
+    place-items: center;
+    width: 2.4rem;
+    border: 0;
+    border-radius: .35rem;
+    background: transparent;
+    color: var(--ssh-muted);
+}
+
+.password-toggle:not(:disabled):hover, .password-toggle[aria-pressed=true] {
+    background: var(--ssh-accent-bg);
+    color: var(--ssh-accent);
+}
+
+.password-status {
+    margin: .35rem 0 0;
+    color: var(--ssh-muted);
+    font-size: .85rem;
+}
+
+.editor-actions {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: flex-end;
+    gap: .6rem;
+    border-top: 1px solid var(--ssh-border);
+}
+
+.editor-actions button {
+    min-width: 5.5rem;
+}
+
+.editor-status {
+    flex: 1 1 12rem;
+    margin: 0;
+}
+
+.editor-placeholder {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    min-height: 100%;
+    gap: .65rem;
+    text-align: center;
+}
+
+.placeholder-icon {
+    width: 3rem;
+    height: 3rem;
+    margin-bottom: .25rem;
+    border-radius: .7rem;
+    font-size: 1.2rem;
+}
+
+.editor-placeholder p {
+    margin: 0;
+    color: var(--ssh-muted);
+}
+
+@container (max-width: 560px) {
+    .connection-list {
+        padding-inline: .5rem;
+    }
+
+    .connection-row {
+        gap: .4rem;
+        padding: .4rem;
+    }
+
+    .connections-heading {
+        align-items: flex-start;
+        flex-direction: column;
+    }
+
+    .address-fields {
+        grid-template-columns: minmax(0, 1fr) 4.5rem;
+        gap: .5rem;
+    }
+}
+
+@container (max-width: 420px) {
+    .connections-workspace {
+        grid-template-columns: minmax(0, 1fr);
+        grid-template-rows: minmax(10rem, 38%) minmax(0, 1fr);
+    }
+
+    .connection-list {
+        border-inline-end: 0;
+        border-bottom: 1px solid var(--ssh-border);
+    }
+
+    .connections-heading {
+        align-items: center;
+        flex-direction: row;
+        margin-bottom: .4rem;
+    }
 }

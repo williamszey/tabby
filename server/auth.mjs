@@ -1,15 +1,27 @@
 import { createHash, createHmac, randomBytes, scrypt, timingSafeEqual } from 'node:crypto'
-import { link, mkdir, readFile, rm, writeFile } from 'node:fs/promises'
+import { link, mkdir, readFile, rename, rm, writeFile } from 'node:fs/promises'
 import { createServer } from 'node:http'
 import { isIP } from 'node:net'
 import { join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { promisify } from 'node:util'
+import { CheckoutGatewayError, createPayments, readPaymentConfig } from './payment.mjs'
 
 const derivePassword = promisify(scrypt)
 const loginPath = '/api/tabby/login'
 const registerPath = '/api/tabby/register'
 const sessionPath = '/api/tabby/session'
+const syncPath = '/api/tabby/ssh-sync'
+const accountPathname = '/api/tabby/account'
+const checkoutPath = '/api/tabby/payment/checkout'
+const notifyPath = '/api/tabby/payment/notify'
+const checkoutStatusPath = '/api/tabby/payment/status'
+const orderStatusPath = '/api/tabby/payment/order'
+const webOrigin = 'https://www.topperapi.com'
+const webCookie = '__Host-topper-account'
+const trialDuration = 7 * 24 * 60 * 60 * 1000
+const syncLimit = 1024 * 1024
+const syncRecordLimit = 200
 const sessionDuration = 30 * 24 * 60 * 60 * 1000
 const limitWindow = 60_000
 const bodyLimit = 4096
@@ -39,7 +51,7 @@ async function initializeAccount (directory, email, password) {
     const id = randomBytes(32).toString('hex')
     const salt = randomBytes(16).toString('hex')
     const hash = (await hashPassword(password, salt)).toString('hex')
-    const record = { version: 1, id, salt, hash }
+    const record = { version: 1, id, salt, hash, createdAt: Date.now() }
     const temporary = `${file}.${randomBytes(8).toString('hex')}.tmp`
     try {
         await writeFile(temporary, JSON.stringify(record), { flag: 'wx', mode: 0o600 })
@@ -47,7 +59,7 @@ async function initializeAccount (directory, email, password) {
     } finally {
         await rm(temporary, { force: true })
     }
-    return id
+    return record
 }
 
 async function loadAccount (directory, emailHash) {
@@ -69,26 +81,36 @@ async function loadAccount (directory, emailHash) {
     return account
 }
 
-async function readCredentials (request, registering) {
+async function readJSON (request, limit) {
     const chunks = []
     let bytes = 0
     for await (const chunk of request.iterator({ destroyOnReturn: false })) {
         bytes += chunk.length
-        if (bytes > bodyLimit) {
+        if (bytes > limit) {
             break
         }
         chunks.push(chunk)
     }
-    if (bytes > bodyLimit) {
+    if (bytes > limit) {
         return { status: 413 }
     }
     try {
-        const { email, password } = JSON.parse(Buffer.concat(chunks).toString('utf8'))
+        return { value: JSON.parse(Buffer.concat(chunks).toString('utf8')) }
+    } catch {
+        return { status: 400 }
+    }
+}
+
+async function readCredentials (request, registering) {
+    const body = await readJSON(request, bodyLimit)
+    if (body.status) return body
+    if (body.value && typeof body.value === 'object') {
+        const { email, password } = body.value
         const normalized = normalizeEmail(email)
         if (normalized && validPassword(password, registering ? 12 : 1)) {
             return { email: normalized, password }
         }
-    } catch { }
+    }
     return { status: 400 }
 }
 
@@ -125,39 +147,161 @@ async function loadSessionKey (directory) {
     return key
 }
 
-export function createAuthServer (directory, proxyIP, sessionKey = randomBytes(32)) {
+function trialExpiration (account) {
+    return Number.isSafeInteger(account.createdAt) ? account.createdAt + trialDuration : null
+}
+
+function validSyncRecords (records, size) {
+    return Array.isArray(records) && records.length <= syncRecordLimit &&
+        records.every(record => record && typeof record.id === 'string' && /^[^\u0000-\u001f]{1,256}$/.test(record.id) &&
+            typeof record.encrypted === 'string' && record.encrypted.length >= 40 && record.encrypted.length <= size &&
+            /^[A-Za-z0-9_-]+$/.test(record.encrypted)) &&
+        new Set(records.map(record => record.id)).size === records.length
+}
+
+function validSyncUpdate (body) {
+    return body && (body.revision === null || (typeof body.revision === 'string' && /^[a-f0-9]{32}$/.test(body.revision))) &&
+        validSyncRecords(body.records === undefined ? [] : body.records, 4096) &&
+        validSyncRecords(body.historyRecords === undefined ? [] : body.historyRecords, 32768) &&
+        Boolean(body.records?.length || body.historyRecords?.length)
+}
+
+async function syncConnections (directory, account, request, response, syncWrites, entitlement) {
+    const { expiresAt, plan } = entitlement
+    const send = (status, body) => response.writeHead(status, {
+        'Cache-Control': 'no-store', 'Content-Type': 'application/json',
+    }).end(JSON.stringify(body))
+    const available = () => expiresAt !== null && Date.now() < expiresAt
+    const unavailable = () => send(403, { expiresAt })
+    if (!available()) return unavailable()
+
+    const historyMode = request.headers['x-topper-ssh-history']
+    const includeHistory = historyMode === '1'
+    const sendState = ({ revision, records, historyRecords = [] }) => send(200, {
+        revision, records, expiresAt, plan, ...(includeHistory ? { historyRecords } : {}),
+    })
+    if (request.method === 'GET' && historyMode === 'status') {
+        return sendState({ revision: null, records: [] })
+    }
+
+    const file = join(directory, `ssh-${account.id}.json`)
+    const read = async () => {
+        try {
+            return JSON.parse(await readFile(file, 'utf8'))
+        } catch (error) {
+            if (error.code !== 'ENOENT') throw error
+            return { revision: null, records: [], historyRecords: [] }
+        }
+    }
+    if (request.method === 'GET') {
+        const state = await read()
+        return available() ? sendState(state) : unavailable()
+    }
+
+    const body = await readJSON(request, syncLimit)
+    if (body.status) {
+        if (body.status === 413) response.setHeader('Connection', 'close')
+        return send(body.status, {})
+    }
+    if (!validSyncUpdate(body.value)) return send(400, {})
+    if (syncWrites.has(account.id)) return send(409, {})
+    syncWrites.add(account.id)
+    try {
+        const current = await read()
+        if (!available()) return unavailable()
+        if (current.revision !== body.value.revision) return send(409, {})
+        const records = new Map(current.records.map(record => [record.id, record]))
+        for (const { id, encrypted } of body.value.records ?? []) records.set(id, { id, encrypted })
+        if (records.size > syncRecordLimit) return send(413, {})
+        const history = new Map((current.historyRecords ?? []).map(record => [record.id, record]))
+        for (const { id, encrypted } of body.value.historyRecords ?? []) {
+            if (!records.has(id)) return send(400, {})
+            history.set(id, { id, encrypted })
+        }
+        const next = { revision: randomBytes(16).toString('hex'), records: [...records.values()], historyRecords: [...history.values()] }
+        const temporary = `${file}.${next.revision}.tmp`
+        try {
+            await writeFile(temporary, JSON.stringify(next), { flag: 'wx', mode: 0o600 })
+            if (!available()) return unavailable()
+            await rename(temporary, file)
+        } finally {
+            await rm(temporary, { force: true })
+        }
+        return sendState(next)
+    } finally {
+        syncWrites.delete(account.id)
+    }
+}
+
+export function createAuthServer (directory, proxyIP, sessionKey = randomBytes(32), paymentConfig = null) {
     let verifying = false
+    const syncWrites = new Set()
+    const payments = createPayments(directory, paymentConfig, webOrigin)
+    const getEntitlement = async account => {
+        const paid = await payments.readEntitlement(account.id)
+        if (paid?.expiresAt > Date.now()) return { plan: 'paid', expiresAt: paid.expiresAt, planId: paid.planId }
+        const trialEnd = trialExpiration(account)
+        const expiresAt = paid?.expiresAt ?? trialEnd
+        if (trialEnd && trialEnd > Date.now()) return { plan: 'trial', expiresAt: trialEnd }
+        return { plan: expiresAt ? 'expired' : 'local', expiresAt, planId: paid?.planId }
+    }
     const unavailableSalt = randomBytes(16).toString('hex')
     const limits = new Map([
         [loginPath, { windowEnds: 0, total: 0, globalLimit: 90, ipLimit: 12, byIP: new Map() }],
         [registerPath, { windowEnds: 0, total: 0, globalLimit: 12, ipLimit: 3, byIP: new Map() }],
         [sessionPath, { windowEnds: 0, total: 0, globalLimit: 360, ipLimit: 60, byIP: new Map() }],
+        [syncPath, { windowEnds: 0, total: 0, globalLimit: 1800, ipLimit: 120, byIP: new Map() }],
+        [accountPathname, { windowEnds: 0, total: 0, globalLimit: 360, ipLimit: 60, byIP: new Map() }],
+        [checkoutPath, { windowEnds: 0, total: 0, globalLimit: 120, ipLimit: 10, byIP: new Map() }],
+        [notifyPath, { windowEnds: 0, total: 0, globalLimit: 360, ipLimit: 120, byIP: new Map() }],
+        [checkoutStatusPath, { windowEnds: 0, total: 0, globalLimit: 600, ipLimit: 60, byIP: new Map() }],
+        [orderStatusPath, { windowEnds: 0, total: 0, globalLimit: 600, ipLimit: 60, byIP: new Map() }],
     ])
     const server = createServer({ headersTimeout: 5000, requestTimeout: 8000, connectionsCheckingInterval: 1000 }, async (request, response) => {
         const reply = status => response.writeHead(status, { 'Cache-Control': 'no-store' }).end()
-        const authenticated = (status, id, emailHash) => {
-            response.setHeader('X-Tabby-Account', id)
-            if (emailHash && request.headers['x-topper-client'] === 'desktop') {
-                const data = `${emailHash}.${id}.${Date.now() + sessionDuration}`
-                response.setHeader('X-Topper-Session', `${data}.${signSession(sessionKey, data).toString('hex')}`)
+        const json = (status, body) => response.writeHead(status, {
+            'Cache-Control': 'no-store', 'Content-Type': 'application/json',
+        }).end(JSON.stringify(body))
+        const setWebSession = (value, age) => response.setHeader('Set-Cookie',
+            `${webCookie}=${value}; Path=/; Secure; HttpOnly; SameSite=Lax; Max-Age=${age}`)
+        const authenticated = (status, account, emailHash) => {
+            response.setHeader('X-Tabby-Account', account.id)
+            const expiresAt = trialExpiration(account)
+            if (expiresAt !== null) response.setHeader('X-Topper-Sync-Expires', expiresAt)
+            const desktop = request.headers['x-topper-client'] === 'desktop'
+            if (emailHash && (desktop || request.headers.origin === webOrigin)) {
+                const data = `${emailHash}.${account.id}.${Date.now() + sessionDuration}`
+                const token = `${data}.${signSession(sessionKey, data).toString('hex')}`
+                if (desktop) response.setHeader('X-Topper-Session', token)
+                else setWebSession(token, sessionDuration / 1000)
             }
             return reply(status)
         }
         if (proxyIP && request.socket.remoteAddress !== proxyIP) {
             return reply(403)
         }
-        const limit = limits.get(request.url)
+        const isNotification = request.url === notifyPath || request.url?.startsWith(notifyPath + '?')
+        const orderStatus = request.url === orderStatusPath || request.url?.startsWith(orderStatusPath + '?')
+        const endpoint = isNotification ? notifyPath : orderStatus ? orderStatusPath : request.url
+        const limit = limits.get(endpoint)
         if (!limit) {
             return reply(404)
         }
-        if (request.method !== 'POST') {
-            response.setHeader('Allow', 'POST')
+        const sync = request.url === syncPath
+        const webAccount = request.url === accountPathname
+        const checkout = request.url === checkoutPath
+        const checkoutStatus = endpoint === checkoutStatusPath
+        const methods = sync ? ['GET', 'PUT'] : webAccount ? ['GET', 'DELETE'] :
+            (isNotification || orderStatus || checkoutStatus) ? ['GET'] : ['POST']
+        if (!methods.includes(request.method)) {
+            response.setHeader('Allow', methods.join(', '))
             return reply(405)
         }
-        if (request.url !== sessionPath && request.headers['content-type']?.split(';')[0].trim() !== 'application/json') {
+        if ((request.method === 'PUT' || (request.method === 'POST' && request.url !== sessionPath)) &&
+            request.headers['content-type']?.split(';')[0].trim() !== 'application/json') {
             return reply(415)
         }
-        if (Number(request.headers['content-length']) > bodyLimit) {
+        if (Number(request.headers['content-length']) > (sync ? syncLimit : bodyLimit)) {
             response.setHeader('Connection', 'close')
             return reply(413)
         }
@@ -180,9 +324,47 @@ export function createAuthServer (directory, proxyIP, sessionKey = randomBytes(3
         limit.byIP.set(ip, ipAttempts + 1)
 
         try {
+            if (checkoutStatus) return json(200, { available: !!paymentConfig })
+            if (isNotification) {
+                if (!paymentConfig) return reply(404)
+                const query = new URL(request.url, webOrigin).searchParams
+                if (!await payments.notify(query)) return reply(400)
+                return response.writeHead(200, { 'Cache-Control': 'no-store', 'Content-Type': 'text/plain' }).end('success')
+            }
+            if (webAccount || checkout || orderStatus) {
+                if (request.method === 'DELETE') {
+                    if (request.headers.origin !== webOrigin) return reply(403)
+                    setWebSession('', 0)
+                    return reply(204)
+                }
+                const cookie = new RegExp(`(?:^|;\\s*)${webCookie}=([^;]+)`).exec(request.headers.cookie ?? '')?.[1]
+                const account = cookie && await verifySession(sessionKey, directory, `Bearer ${cookie}`)
+                if (!account) return reply(401)
+                if (orderStatus) {
+                    const query = new URL(request.url, webOrigin).searchParams
+                    const order = await payments.readOrderStatus(account.id, query.get('order'))
+                    return order ? json(200, order) : reply(404)
+                }
+                if (checkout) {
+                    if (request.headers.origin !== webOrigin) return reply(403)
+                    if (!paymentConfig) return reply(503)
+                    const body = await readJSON(request, bodyLimit)
+                    if (body.status) return reply(body.status)
+                    const order = await payments.checkout({ id: account.id, trialExpiresAt: trialExpiration(account) }, body.value?.plan, ip)
+                    if (!order) return reply(400)
+                    return json(201, order)
+                }
+                const entitlement = await getEntitlement(account)
+                return json(200, { ...entitlement, checkoutAvailable: !!paymentConfig })
+            }
+            if (sync) {
+                const account = await verifySession(sessionKey, directory, request.headers.authorization)
+                if (!account) return reply(401)
+                return await syncConnections(directory, account, request, response, syncWrites, await getEntitlement(account))
+            }
             if (request.url === sessionPath) {
                 const account = await verifySession(sessionKey, directory, request.headers.authorization)
-                return account ? authenticated(204, account.id) : reply(401)
+                return account ? authenticated(204, account) : reply(401)
             }
             const registering = request.url === registerPath
             const credentials = await readCredentials(request, registering)
@@ -213,14 +395,18 @@ export function createAuthServer (directory, proxyIP, sessionKey = randomBytes(3
                 const account = await loadAccount(directory, emailHash)
                 const hash = await hashPassword(password, account?.salt ?? unavailableSalt)
                 if (account && timingSafeEqual(hash, Buffer.from(account.hash, 'hex'))) {
-                    return authenticated(204, account.id, emailHash)
+                    return authenticated(204, account, emailHash)
                 }
                 return reply(401)
             } finally {
                 verifying = false
             }
-        } catch {
+        } catch (error) {
             if (!response.destroyed) {
+                if (error instanceof CheckoutGatewayError) {
+                    console.warn('PototaPay checkout failed', error.message, error.status ?? '')
+                    return json(502, { error: 'payment_gateway_unavailable' })
+                }
                 return reply(500)
             }
         }
@@ -234,5 +420,6 @@ if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.ur
     const host = process.env.TABBY_AUTH_HOST ?? '127.0.0.1'
     const port = Number(process.env.TABBY_AUTH_PORT ?? 18742)
     await mkdir(directory, { recursive: true, mode: 0o700 })
-    createAuthServer(directory, process.env.TABBY_AUTH_PROXY_IP, await loadSessionKey(directory)).listen(port, host, () => console.log(`Tabby auth listening on ${host}:${port}`))
+    const payment = await readPaymentConfig(process.env.TOPPER_POTOTA_CONFIG)
+    createAuthServer(directory, process.env.TABBY_AUTH_PROXY_IP, await loadSessionKey(directory), payment).listen(port, host, () => console.log(`Tabby auth listening on ${host}:${port}`))
 }

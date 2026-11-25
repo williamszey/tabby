@@ -13,3 +13,20 @@
     right: 1px;
     pointer-events: none;
 }
+
+.xterm.tabby-link-modifier:not(.tabby-link-can-open) .xterm-cursor-pointer {
+    cursor: text;
+}
+
+.xterm .tabby-link-highlight {
+    position: absolute;
+    inset: 0;
+    z-index: 7;
+    pointer-events: none;
+}
+
+.xterm .tabby-link-highlight span {
+    position: absolute;
+    background: #4798ed40;
+    border-radius: 2px;
+}

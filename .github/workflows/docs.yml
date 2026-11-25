@@ -1,8 +1,5 @@
 name: Docs
-on:
-  push:
-    branches-ignore: [topper-terminal-preview]
-    tags: ['**']
+on: push
 jobs:
   build:
     runs-on: ubuntu-latest

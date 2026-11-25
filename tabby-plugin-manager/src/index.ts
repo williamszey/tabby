@@ -4,11 +4,9 @@ import { FormsModule } from '@angular/forms'
 import { NgbModule } from '@ng-bootstrap/ng-bootstrap'
 
 import TabbyCorePlugin from 'tabby-core'
-import { SettingsTabProvider } from 'tabby-settings'
 
 import { PluginsSettingsTabComponent } from './components/pluginsSettingsTab.component'
 import { PluginManagerService } from './services/pluginManager.service'
-import { PluginsSettingsTabProvider } from './settings'
 
 @NgModule({
     imports: [
@@ -16,9 +14,6 @@ import { PluginsSettingsTabProvider } from './settings'
         FormsModule,
         NgbModule,
         TabbyCorePlugin,
-    ],
-    providers: [
-        { provide: SettingsTabProvider, useClass: PluginsSettingsTabProvider, multi: true },
     ],
     declarations: [
         PluginsSettingsTabComponent,

@@ -5,12 +5,18 @@ title-bar(
   [class.inset]='hostApp.platform == Platform.macOS && !hostWindow.isFullscreen'
 )
 
+.mac-window-drag-strip(
+    *ngIf='ready && hostApp.platform === Platform.macOS && !hostWindow.isFullscreen && config.store.appearance.frame === "thin" && config.store.appearance.dock === "off"',
+    aria-hidden='true',
+)
+
 .window.d-flex
     profile-tree(
         *ngIf='ready && config.store.showProfileTree',
         [class.mac-inset]='hostApp.platform == Platform.macOS \
         && !hostWindow.isFullscreen \
-        && config.store.appearance.frame == "thin"'
+        && config.store.appearance.frame == "thin" \
+        && config.store.appearance.dock != "off"'
     )
 
     .content.main.h-100(
@@ -28,6 +34,7 @@ title-bar(
             .inset.background(*ngIf='hostApp.platform == Platform.macOS \
             && !hostWindow.isFullscreen \
             && config.store.appearance.frame == "thin" \
+            && config.store.appearance.dock != "off" \
             && (config.store.appearance.tabsLocation == "top" || config.store.appearance.tabsLocation == "left") \
             && !config.store.showProfileTree')
             .tabs(

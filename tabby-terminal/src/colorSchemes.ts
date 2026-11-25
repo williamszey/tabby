@@ -5,7 +5,7 @@ import { TerminalColorScheme } from 'tabby-core'
 @Injectable({ providedIn: 'root' })
 export class DefaultColorSchemes extends TerminalColorSchemeProvider {
     static defaultColorScheme: TerminalColorScheme = {
-        name: 'Tabby Default',
+        name: 'TopperTerminal Default',
         foreground: '#cacaca',
         background: '#171717',
         cursor: '#bbbbbb',
@@ -30,7 +30,7 @@ export class DefaultColorSchemes extends TerminalColorSchemeProvider {
     }
 
     static defaultLightColorScheme: TerminalColorScheme = {
-        name: 'Tabby Default Light',
+        name: 'TopperTerminal Default Light',
         foreground: '#4d4d4c',
         background: '#f8f9fa',
         cursor: '#4d4d4c',

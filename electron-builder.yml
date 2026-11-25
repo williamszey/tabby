@@ -67,6 +67,7 @@ mac:
   entitlements: "./build/mac/entitlements.plist"
   entitlementsInherit: "./build/mac/entitlements.plist"
   extendInfo:
+    CFBundleDisplayName: TopperTerminal
     ElectronTeamID: ${teamId}
     NSRequiresAquaSystemAppearance: false
     NSCameraUsageDescription: "A subprocess requests access to the device's camera."

@@ -120,7 +120,7 @@ div.mt-4
             (ngModelChange)='config.save()',
         )
             option([ngValue]='null', translate) No modifier
-            option(value='ctrlKey', *ngIf='hostApp.platform !== Platform.macOS') Ctrl
+            option(value='ctrlKey') Ctrl
             option(value='altKey') {{altKeyName}}
             option(value='shiftKey') Shift
             option(value='metaKey') {{metaKeyName}}
@@ -266,7 +266,7 @@ div.mt-4(*ngIf='hostApp.platform === Platform.Windows')
 
     .form-line
         .header
-            .title(translate) Set Tabby as %COMSPEC%
+            .title(translate) Set TopperTerminal as %COMSPEC%
             .description(translate) Allows opening .bat files in tabs, but breaks some shells
         toggle(
             [(ngModel)]='config.store.terminal.setComSpec',

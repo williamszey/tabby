@@ -13,7 +13,7 @@
     ng-content
 
     button.btn.btn-sm.btn-link(
-        *ngIf='tab.enableToolbar',
+        *ngIf='tab.enableToolbar && !tab.toolbarAlwaysPinned',
         (click)='tab.togglePinToolbar()',
         (mouseenter)='tab.showToolbar()',
         (mouseleave)='tab.hideToolbar()'

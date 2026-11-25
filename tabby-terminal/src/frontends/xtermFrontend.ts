@@ -90,6 +90,7 @@ class FlowControl {
 
 /** @hidden */
 export class XTermFrontend extends Frontend {
+    isLinkActivationClick?: (event: MouseEvent) => boolean
     enableResizing = true
     xterm: Terminal
     protected xtermCore: any
@@ -503,7 +504,7 @@ export class XTermFrontend extends Frontend {
                 // With right-click turned off, the click is the app's instead.
                 const e = event as MouseEvent
                 const rightClick = e.button === 2 || e.button === 0 && e.ctrlKey
-                if (rightClick && this.isMouseTrackingActive() && this.configService.store.terminal.rightClick !== 'off') {
+                if (rightClick && !this.isLinkActivationClick?.(e) && this.isMouseTrackingActive() && this.configService.store.terminal.rightClick !== 'off') {
                     // "immediate" also skips our own bubble listener when the host itself is the target
                     event.stopImmediatePropagation()
                     this.mouseEvent.next(e)

@@ -6,20 +6,15 @@ terminal-toolbar([tab]='this')
         onclick='event.stopPropagation()'
     ) {{profile.options.user}}@{{profile.options.host}}:{{profile.options.port}}
 
-    .me-2(
-        ngbDropdown,
-        container='body',
-        *ngIf='session && !session.supportsWorkingDirectory()',
-        placement='bottom-right bottom-left bottom'
+    button.btn.btn-sm.btn-link.me-2(
+        *ngIf='commandHistoryAvailable',
+        type='button',
+        title='命令历史',
+        [attr.aria-expanded]='commandHistoryVisible',
+        (click)='toggleCommandHistory()'
     )
-        button.btn.btn-sm.btn-link(ngbDropdownToggle)
-            i.far.fa-lightbulb.text-primary
-        .bg-dark(ngbDropdownMenu)
-            a.d-flex.align-items-center(ngbDropdownItem, (click)='platform.openExternal("https://tabby.sh/go/cwd-detection")')
-                .me-auto
-                    strong(translate) Working directory detection
-                    div(translate) Learn how to allow Tabby to detect remote shell's working directory.
-                i.fas.fa-arrow-right.ms-4
+        i.fas.fa-history(aria-hidden='true')
+        span 命令
 
     button.btn.btn-sm.btn-link.me-2((click)='reconnect()')
         i.fas.fa-redo
@@ -44,14 +39,86 @@ sftp-panel.bg-dark(
     *ngIf='sftpPanelVisible && sshSession',
     (click)='$event.stopPropagation()',
     [session]='sshSession!',
-    [cwdDetectionAvailable]='session?.supportsWorkingDirectory() ?? false',
     (closed)='sftpPanelVisible = false'
 )
 
 keyboard-interactive-auth-panel.bg-dark(
     *ngIf='activeKIPrompt',
     [prompt]='activeKIPrompt',
-    [profile]='profile',
     (click)='$event.stopPropagation()',
     (done)='activeKIPrompt = null; frontend?.focus()'
 )
+
+aside.command-history(
+    *ngIf='commandHistoryVisible',
+    aria-label='命令历史',
+    (click)='$event.stopPropagation()'
+)
+    header.command-history-header
+        .command-history-tabs(
+            role='tablist',
+            aria-label='命令列表',
+            (keydown)='navigateCommandHistoryTabs($event, recentTab, favoritesTab)'
+        )
+            button.command-history-tab(
+                #recentTab,
+                type='button',
+                role='tab',
+                aria-label='最近命令',
+                title='最近命令',
+                [attr.aria-selected]='commandHistoryTab === "recent"',
+                [attr.tabindex]='commandHistoryTab === "recent" ? 0 : -1',
+                (click)='commandHistoryTab = "recent"'
+            )
+                i.fas.fa-history(aria-hidden='true')
+            button.command-history-tab(
+                #favoritesTab,
+                type='button',
+                role='tab',
+                aria-label='收藏',
+                title='收藏',
+                [attr.aria-selected]='commandHistoryTab === "favorites"',
+                [attr.tabindex]='commandHistoryTab === "favorites" ? 0 : -1',
+                (click)='commandHistoryTab = "favorites"'
+            )
+                i.fas.fa-star(aria-hidden='true')
+
+    .command-history-content
+        section(*ngIf='commandHistoryTab === "recent"', role='tabpanel', aria-label='最近命令')
+            .command-history-help(*ngIf='!historyEnabled')
+                button.btn.btn-sm.command-history-enable(
+                    type='button',
+                    [disabled]='!canInsertCommand',
+                    (click)='enableCommandHistory()'
+                ) 启用 Bash 命令记录
+                small 在 Bash 5.1+ 的提示符下点击，再按回车。命令将按连接加密保存和同步。
+            p.command-history-empty(*ngIf='!commandCollections.recent.length') 暂无记录
+            .command-history-row(*ngFor='let entry of commandCollections.recent')
+                button.command-text(type='button', [disabled]='!canInsertCommand', [title]='entry.command', (click)='insertRecentCommand(entry.command)') {{entry.command}}
+                button.command-star(
+                    type='button',
+                    [class.starred]='commandCollections.favorites.includes(entry.command)',
+                    [attr.aria-pressed]='commandCollections.favorites.includes(entry.command)',
+                    [attr.aria-label]='commandCollections.favorites.includes(entry.command) ? "取消收藏" : "收藏命令"',
+                    [title]='commandCollections.favorites.includes(entry.command) ? "取消收藏" : commandCollections.favorites.length >= maximumFavorites ? "收藏已满" : "收藏命令"',
+                    [disabled]='!commandCollections.favorites.includes(entry.command) && commandCollections.favorites.length >= maximumFavorites',
+                    (click)='setCommandFavorite(entry.command, !commandCollections.favorites.includes(entry.command))'
+                )
+                    i.fa-star([class.fas]='commandCollections.favorites.includes(entry.command)', [class.far]='!commandCollections.favorites.includes(entry.command)', aria-hidden='true')
+        section(*ngIf='commandHistoryTab === "favorites"', role='tabpanel', aria-label='收藏')
+            p.command-history-empty(*ngIf='!commandCollections.favorites.length') 点击命令旁的星标收藏
+            .command-history-row(*ngFor='let command of commandCollections.favorites')
+                button.command-text(type='button', [disabled]='!canInsertCommand', [title]='command', (click)='insertRecentCommand(command)') {{command}}
+                button.command-star.starred(type='button', aria-label='取消收藏', title='取消收藏', (click)='setCommandFavorite(command, false)')
+                    i.fas.fa-star(aria-hidden='true')
+
+
+button.command-history-toggle(
+    *ngIf='commandHistoryAvailable',
+    type='button',
+    [attr.aria-expanded]='commandHistoryVisible',
+    [attr.aria-label]='commandHistoryVisible ? "收起命令栏" : "展开命令栏"',
+    [title]='commandHistoryVisible ? "收起命令栏" : "展开命令栏"',
+    (click)='$event.stopPropagation(); toggleCommandHistory()'
+)
+    i.fas([class.fa-chevron-right]='commandHistoryVisible', [class.fa-chevron-left]='!commandHistoryVisible', aria-hidden='true')

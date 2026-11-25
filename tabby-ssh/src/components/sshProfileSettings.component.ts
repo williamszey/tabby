@@ -105,7 +105,7 @@ export class SSHProfileSettingsComponent implements ProfileSettingsComponent<SSH
         return (await this.platform.showMessageBox({
             type: 'warning',
             message: this.translate.instant(_('Save an empty password?')),
-            detail: this.translate.instant(_('This only works if the server permits empty passwords. Tabby will offer it on every connection.')),
+            detail: this.translate.instant(_('This only works if the server permits empty passwords. The client will offer it on every connection.')),
             buttons: [
                 this.translate.instant(_('Save')),
                 this.translate.instant(_('Cancel')),

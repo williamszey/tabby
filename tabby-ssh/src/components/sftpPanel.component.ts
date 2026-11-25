@@ -27,7 +27,6 @@ export class SFTPPanelComponent {
     @Input() path = '/'
     @Output() pathChange = new EventEmitter<string>()
     pathSegments: PathSegment[] = []
-    @Input() cwdDetectionAvailable = false
     editingPath: string|null = null
     showFilter = false
     filterText = ''
@@ -355,14 +354,6 @@ export class SFTPPanelComponent {
     async showContextMenu (item: SFTPFile, event: MouseEvent): Promise<void> {
         event.preventDefault()
         this.platform.popupContextMenu(await this.buildContextMenu(item), event)
-    }
-
-    get shouldShowCWDTip (): boolean {
-        return !window.localStorage.sshCWDTipDismissed
-    }
-
-    dismissCWDTip (): void {
-        window.localStorage.sshCWDTipDismissed = 'true'
     }
 
     editPath (): void {

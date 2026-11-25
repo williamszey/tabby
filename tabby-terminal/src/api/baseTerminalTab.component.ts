@@ -94,6 +94,9 @@ export class BaseTerminalTabComponent<P extends BaseTerminalProfile> extends Bas
     @HostBinding('class.toolbar-pinned') pinToolbar = false
 
     /** @hidden */
+    toolbarAlwaysPinned = false
+
+    /** @hidden */
     @HostBinding('class.toolbar-revealed') revealToolbar = false
 
     frontend?: Frontend
@@ -376,7 +379,7 @@ export class BaseTerminalTabComponent<P extends BaseTerminalProfile> extends Bas
 
     /** @hidden */
     ngOnInit (): void {
-        this.pinToolbar = this.enableToolbar && (window.localStorage.pinTerminalToolbar ?? 'true') === 'true'
+        this.pinToolbar = this.enableToolbar && (this.toolbarAlwaysPinned || (window.localStorage.pinTerminalToolbar ?? 'true') === 'true')
 
         this.focused$.subscribe(() => {
             this.configure()
@@ -737,6 +740,10 @@ export class BaseTerminalTabComponent<P extends BaseTerminalProfile> extends Bas
 
         const frontend = this.frontend
         this.termContainerSubscriptions.subscribe(frontend.mouseEvent$, event => {
+            if ((event.type === 'mousedown' || event.type === 'mouseup') &&
+                frontend instanceof XTermFrontend && frontend.isLinkActivationClick?.(event)) {
+                return
+            }
             if (event.type === 'mousedown') {
                 if (event.which === 1) {
                     this.multifocus.cancel()

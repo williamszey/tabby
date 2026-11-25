@@ -4,7 +4,7 @@ import { ConfigProvider } from 'tabby-core'
 export class ClickableLinksConfigProvider extends ConfigProvider {
     defaults = {
         clickableLinks: {
-            modifier: null,
+            modifier: 'ctrlKey',
         },
     }
 

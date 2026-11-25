@@ -129,7 +129,7 @@ export class ElectronUpdaterService extends UpdaterService {
             if ((await this.platform.showMessageBox(
                 {
                     type: 'warning',
-                    message: this.translate.instant('Installing the update will close all tabs and restart Tabby.'),
+                    message: this.translate.instant('Installing the update will close all tabs and restart TopperTerminal.'),
                     buttons: [
                         this.translate.instant('Update'),
                         this.translate.instant('Cancel'),
